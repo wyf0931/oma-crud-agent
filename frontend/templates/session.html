@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>会话 {session_id} - 灯神 · Wishlamp</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.03);
+        }
+
+        .input-area {
+            background: #fafbfc;
+            border: 2px solid #e5e7eb;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .input-area:focus {
+            outline: none;
+            border-color: #146c5f;
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(20, 108, 95, 0.12);
+        }
+
+        /* ── Milestones ── */
+        .milestone-list { display: flex; align-items: center; gap: 16px; height: 48px; max-height: 48px; overflow-x: auto; overflow-y: hidden; padding: 0; }
+        .milestone { display: flex; flex-direction: column; align-items: center; min-width: 92px; flex: 1 0 92px; cursor: pointer; transition: transform 0.15s; }
+        .milestone:hover { transform: translateY(-1px); }
+        .milestone-dot { width: 12px; height: 12px; border-radius: 50%; background: #e5e7eb; border: 2px solid #e5e7eb; transition: all 0.35s ease; flex-shrink-0; }
+        .milestone.done .milestone-dot { background: #146c5f; border-color: #146c5f; }
+        .milestone.running .milestone-dot { background: #146c5f; border-color: #146c5f; animation: pulse-ring 1.5s ease infinite; }
+        .milestone.selected .milestone-dot { border-color: #0e574d; box-shadow: 0 0 0 3px rgba(20,108,95,0.24); }
+        .milestone-text { font-size: 11px; margin-top: 6px; color: #9ca3af; text-align: center; line-height: 1.2; transition: color 0.3s; white-space: nowrap; }
+        .milestone.done .milestone-text, .milestone.running .milestone-text { color: #374151; font-weight: 600; }
+        .milestone.selected .milestone-text { color: #0e574d; font-weight: 700; }
+        .milestone-bar { flex: 1 0 16px; height: 2px; background: #e5e7eb; margin-top: 0; min-width: 16px; transition: background 0.35s; }
+        .milestone-bar.done { background: #146c5f; }
+        @keyframes pulse-ring {
+            0%   { box-shadow: 0 0 0 3px rgba(20,108,95,0.28); }
+            50%  { box-shadow: 0 0 0 7px rgba(20,108,95,0.10); }
+            100% { box-shadow: 0 0 0 3px rgba(20,108,95,0.28); }
+        }
+
+        /* ── Detail panel ── */
+        .detail-section { border-left: 3px solid #e5e7eb; padding-left: 16px; margin-bottom: 16px; }
+        .detail-section.thinking { border-left-color: #f59e0b; }
+        .detail-section.prompt   { border-left-color: #146c5f; }
+        .detail-section.response { border-left-color: #10b981; }
+        .detail-section.error    { border-left-color: #ef4444; }
+        .detail-pre {
+            font-family: 'Monaco', 'Menlo', 'Courier New', monospace; font-size: 12px; line-height: 1.6;
+            white-space: pre-wrap; word-break: break-word; background: #f9fafb;
+            border-radius: 8px; padding: 12px; max-height: 300px; overflow-y: auto;
+        }
+
+        .log-entry { font-family: 'Monaco', 'Menlo', 'Courier New', monospace; font-size: 13px; padding: 8px 12px; border-left: 3px solid #e5e7eb; margin-bottom: 8px; background: #fafbfc; border-radius: 0 6px 6px 0; }
+        .log-entry.info    { border-left-color: #146c5f; background: #f5f3ff; }
+        .log-entry.success { border-left-color: #10b981; background: #f0fdf4; }
+        .log-entry.error   { border-left-color: #ef4444; background: #fef2f2; }
+        .preview-frame { border: none; background: white; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fade-in { animation: fadeIn 0.3s ease forwards; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-slide-up { animation: slideUp 0.4s ease forwards; }
+        .status-badge { padding: 4px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+        .status-badge.running   { background: linear-gradient(135deg, #146c5f, #1e8fb0); color: white; }
+        .status-badge.completed { background: #10b981; color: white; }
+        .status-badge.failed    { background: #ef4444; color: white; }
+        .status-badge.pending   { background: #e5e7eb; color: #6b7280; }
+
+        .session-item { transition: all 0.15s ease; }
+        .session-item:hover { background: #f3f4ff; }
+        .session-item.active-session { background: #eef2ff; }
+        .session-item .delete-btn { opacity: 0; transition: all 0.2s ease; }
+        .session-item:hover .delete-btn { opacity: 1; }
+        .session-item .delete-btn:hover { background: #fee2e2; color: #ef4444; }
+        .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+        .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+
+        /* Dialog */
+        .dialog-backdrop {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none; align-items: center; justify-content: center;
+            z-index: 9999;
+        }
+        .dialog-backdrop.show { display: flex; }
+        .dialog-content {
+            background: white; border-radius: 12px; padding: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            max-width: 400px; width: 90%;
+        }
+        .task-duration { white-space: nowrap; }
+        .app-shell { background: #f7f8f4; }
+        .app-sidebar {
+            width: 260px;
+            transition: width 200ms ease, transform 200ms ease-in-out;
+        }
+        .sidebar-label,
+        .sidebar-section {
+            transition: opacity 160ms ease;
+        }
+        .sidebar-icon-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            color: #657268;
+            transition: all 0.15s ease;
+        }
+        .sidebar-icon-btn:hover { background: #edf1e8; color: #111814; }
+        .mobile-sidebar-backdrop { display: none; }
+        @media (min-width: 1024px) {
+            .app-sidebar.is-collapsed { width: 56px; }
+            .app-sidebar.is-collapsed .sidebar-label,
+            .app-sidebar.is-collapsed .sidebar-section { display: none; }
+            .app-sidebar.is-collapsed .sidebar-action { justify-content: center; padding-left: 0; padding-right: 0; }
+            .app-sidebar.is-collapsed .brand-button { width: 40px; height: 40px; padding: 0; }
+            .app-sidebar.is-collapsed .brand-button > span { width: 40px; height: 40px; }
+            .app-sidebar.is-collapsed .sidebar-create-btn { width: 40px; height: 40px; padding: 0; justify-content: center; }
+            .app-sidebar.is-collapsed .sidebar-top { align-items: center; }
+            .app-sidebar.is-collapsed .sidebar-footer { flex-direction: column; align-items: center; gap: 4px; }
+        }
+        @media (max-width: 1023px) {
+            .app-sidebar {
+                position: fixed;
+                inset: 0 auto 0 0;
+                z-index: 40;
+                transform: translateX(-100%);
+                box-shadow: 24px 0 60px rgba(17,24,20,0.18);
+            }
+            .app-sidebar.is-mobile-open { transform: translateX(0); }
+            .mobile-sidebar-backdrop {
+                position: fixed;
+                inset: 0;
+                z-index: 30;
+                background: rgba(17,24,20,0.36);
+            }
+            .mobile-sidebar-backdrop.is-visible { display: block; }
+        }
+        .dark body,
+        .dark .app-shell { background: #0b1220; color: #f8fafc; }
+        .dark .app-sidebar,
+        .dark .dialog-content,
+        .dark .sidebar-icon-btn:hover { background: #1f2937; color: #f8fafc; }
+        .dark .sidebar-icon-btn,
+        .dark .sidebar-action { color: #e5e7eb; }
+        .dark .app-shell main { background: #0b1220; color: #f8fafc; }
+        .dark .app-shell .bg-white { background: #111827 !important; color: #f8fafc; }
+        .dark .app-shell [class*="bg-[#f7f8f4]"] { background: #111827 !important; }
+        .dark .app-shell [class*="bg-[#edf1e8]"] { background: #1f2937 !important; }
+        .dark .app-shell [class*="bg-[#f9fafb]"] { background: #0f172a !important; }
+        .dark .app-shell [class*="border-[#d8dfd5]"],
+        .dark .app-shell [class*="border-[#edf1e8]"],
+        .dark .app-shell [class*="border-[#e5e7eb]"] { border-color: #283548 !important; }
+        .dark .app-shell [class*="text-[#111814]"],
+        .dark .app-shell [class*="text-[#536158]"],
+        .dark .app-shell [class*="text-[#374151]"] { color: #f8fafc !important; }
+        .dark .app-shell [class*="text-[#657268]"] { color: #a8b3c2 !important; }
+        .dark .glass-card { background: #111827; border-color: #283548; box-shadow: 0 20px 60px rgba(0,0,0,0.28); }
+        .dark .input-area { background: #111827; border-color: #334155; color: #f8fafc; }
+        .dark .input-area:focus { background: #0f172a; border-color: #2aa892; }
+        .dark .input-area::placeholder { color: #64748b; }
+        .dark .detail-pre { background: #0f172a; color: #e2e8f0; }
+        .dark .milestone-text { color: #94a3b8; }
+        .dark .milestone.done .milestone-text,
+        .dark .milestone.running .milestone-text { color: #e2e8f0; }
+        .dark .milestone.selected .milestone-text { color: #5eead4; }
+        .dark .milestone-bar { background: #334155; }
+        .dark .milestone-bar.done { background: #2dd4bf; }
+        .dark .session-item:hover { background: #1f2937; }
+        .dark .session-item.active-session { background: #26334a; }
+        .dark .session-item .delete-btn:hover { background: #3f2934; color: #fca5a5; }
+    </style>
+
+    <script>
+        function safeCreateIcons() {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons();
+            }
+        }
+        function escHtml(s) {
+            const d = document.createElement('div');
+            d.textContent = s || '';
+            return d.innerHTML;
+        }
+        function toggleTheme() {
+            const nextDark = !document.documentElement.classList.contains('dark');
+            document.documentElement.classList.toggle('dark', nextDark);
+            localStorage.setItem('theme', nextDark ? 'dark' : 'light');
+            updateThemeIcon();
+        }
+        function updateThemeIcon() {
+            const icon = document.getElementById('themeIcon');
+            if (!icon) return;
+            icon.setAttribute('data-lucide', document.documentElement.classList.contains('dark') ? 'sun' : 'moon');
+            safeCreateIcons();
+        }
+        let sidebarCollapsed = localStorage.getItem('info-agent:sidebar-collapsed') === 'true';
+        let sidebarOpen = false;
+        function toggleSidebarCollapsed() {
+            if (window.innerWidth < 1024) {
+                sidebarOpen = !sidebarOpen;
+                updateSidebarUI();
+                return;
+            }
+            sidebarCollapsed = !sidebarCollapsed;
+            localStorage.setItem('info-agent:sidebar-collapsed', String(sidebarCollapsed));
+            updateSidebarUI();
+        }
+        function openMobileSidebar() {
+            sidebarOpen = true;
+            updateSidebarUI();
+        }
+        function closeMobileSidebar() {
+            sidebarOpen = false;
+            updateSidebarUI();
+        }
+        function updateSidebarUI() {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('mobileSidebarBackdrop');
+            if (!sidebar) return;
+            sidebar.classList.toggle('is-collapsed', window.innerWidth >= 1024 && sidebarCollapsed);
+            sidebar.classList.toggle('is-mobile-open', window.innerWidth < 1024 && sidebarOpen);
+            if (backdrop) backdrop.classList.toggle('is-visible', window.innerWidth < 1024 && sidebarOpen);
+        }
+        const storedTheme = localStorage.getItem('theme');
+        if (storedTheme === 'dark' || (!storedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        }
+        window.addEventListener('resize', updateSidebarUI);
+    </script>
+</head>
+<body class="h-screen bg-[#f7f8f4]">
+    <div class="app-shell flex h-screen overflow-hidden">
+        <div id="mobileSidebarBackdrop" class="mobile-sidebar-backdrop" onclick="closeMobileSidebar()"></div>
+        <aside id="sidebar" class="app-sidebar flex-shrink-0 bg-white border-r border-[#d8dfd5] flex flex-col overflow-visible">
+            <div class="sidebar-top flex flex-col gap-3 px-3 py-3 border-b border-[#edf1e8]">
+                <div class="flex items-center gap-2 border-b border-[#edf1e8] pb-3">
+                    <button onclick="toggleSidebarCollapsed()" class="sidebar-action brand-button flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-2 text-left text-[#111814] hover:bg-[#edf1e8] transition-colors" title="灯神 · Wishlamp">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#146c5f] text-white shadow-sm">
+                            <i data-lucide="loader" class="h-4 w-4"></i>
+                        </span>
+                        <span class="sidebar-label truncate text-sm font-bold">灯神 · Wishlamp</span>
+                    </button>
+                    <button onclick="toggleSidebarCollapsed()" class="sidebar-label hidden lg:inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#657268] hover:bg-[#edf1e8]" title="Collapse sidebar">
+                        <i data-lucide="chevrons-left" class="h-4 w-4"></i>
+                    </button>
+                </div>
+                <a href="/" class="sidebar-action sidebar-create-btn flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-[#111814] hover:bg-[#edf1e8] transition-colors" title="新任务">
+                    <i data-lucide="plus" class="h-4 w-4 shrink-0"></i>
+                    <span class="sidebar-label">新任务</span>
+                </a>
+            </div>
+            <div class="sidebar-section px-4 py-3">
+                <h2 class="text-xs font-semibold text-[#536158] uppercase tracking-wider">历史记录</h2>
+            </div>
+            <div id="sessionList" class="sidebar-section flex-1 overflow-y-auto sidebar-scroll px-2 pb-2 space-y-1"></div>
+            <div class="sidebar-footer border-t border-[#edf1e8] p-3 flex justify-start">
+                <button onclick="openSettings()" title="系统设置" class="sidebar-icon-btn h-9 w-9">
+                    <i data-lucide="settings" class="h-4 w-4"></i>
+                </button>
+                <button onclick="toggleTheme()" title="切换深色/浅色模式" class="sidebar-icon-btn h-9 w-9">
+                    <i id="themeIcon" data-lucide="moon" class="h-4 w-4"></i>
+                </button>
+                <a href="/magic/session/{session_id}" title="进入魔法工坊" class="sidebar-icon-btn h-9 w-9"><i data-lucide="wand-sparkles" class="h-4 w-4"></i></a>
+            </div>
+        </aside>
+
+        <main class="flex-1 overflow-y-auto">
+            <div class="w-full mx-auto p-6 space-y-5">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <button onclick="openMobileSidebar()" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#d8dfd5] bg-white text-[#536158] shadow-sm lg:hidden" title="Open sidebar">
+                            <i data-lucide="menu" class="h-5 w-5"></i>
+                        </button>
+                        <a href="/" class="hidden sm:inline-flex h-10 w-10 items-center justify-center rounded-lg border-0 bg-transparent text-[#657268] hover:bg-[#edf1e8] hover:text-[#536158] transition-colors" title="返回">
+                            <i data-lucide="chevron-left" class="h-5 w-5"></i>
+                        </a>
+                        <span id="navSessionName" class="truncate text-sm font-medium text-[#536158]">Session</span>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <div id="headerActions" class="hidden items-center gap-2">
+                            <button id="headerPreviewBtn" onclick="launchPreview()" class="inline-flex items-center gap-1.5 rounded-lg bg-[#146c5f] px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#0e574d]">
+                                <i data-lucide="eye" class="h-3.5 w-3.5"></i>
+                                <span>预览</span>
+                            </button>
+                            <button id="headerDownloadBtn" onclick="downloadProject()" class="inline-flex items-center gap-1.5 rounded-lg bg-[#146c5f] px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#0e574d]">
+                                <i data-lucide="download" class="h-3.5 w-3.5"></i>
+                                <span>下载项目</span>
+                            </button>
+                        </div>
+                        <div class="flex items-center gap-3 shrink-0">
+                            <span id="taskDuration" class="task-duration text-xs text-[#657268]" aria-label="任务总耗时"></span>
+                            <div id="statusBadge" class="status-badge pending">初始化</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Milestone bar -->
+                <div class="bg-white rounded-xl border border-[#d8dfd5] px-6 py-4">
+                    <div class="milestone-list" id="milestoneBar"></div>
+                </div>
+
+                <div id="detailPanel" class="hidden animate-fade-in">
+                    <div class="bg-white rounded-xl border border-[#d8dfd5] p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 id="detailTitle" class="font-semibold text-[#111814] text-lg"></h3>
+                                <p id="detailSummary" class="text-sm text-[#657268] mt-1"></p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span id="detailDuration" class="text-xs text-[#657268]"></span>
+                            </div>
+                        </div>
+                        <div id="detailContent" class="space-y-4"></div>
+                    </div>
+                </div>
+
+                <div id="previewSection" class="hidden animate-fade-in">
+                    <div class="bg-white rounded-xl border border-[#d8dfd5] overflow-hidden">
+                        <div class="bg-[#edf1e8] px-4 py-2.5 flex items-center gap-2 border-b">
+                            <div class="flex gap-1.5">
+                                <div class="w-3 h-3 rounded-full bg-red-400"></div>
+                                <div class="w-3 h-3 rounded-full bg-yellow-400"></div>
+                                <div class="w-3 h-3 rounded-full bg-green-400"></div>
+                            </div>
+                            <div class="flex-1 mx-4"><div id="previewUrl" class="bg-white rounded px-3 py-1 text-xs text-[#657268] text-center truncate">-</div></div>
+                            <a id="previewLink" href="#" target="_blank" class="text-xs text-[#146c5f] hover:text-[#0e574d] whitespace-nowrap">新窗口打开 ↗</a>
+                        </div>
+                        <iframe id="previewFrame" class="preview-frame w-full border-0" style="height: calc(100vh - 280px);" src="about:blank"></iframe>
+                    </div>
+                    <div class="mt-3 flex gap-4 text-xs text-[#657268]">
+                        <span>📁 <span id="projectPath" class="font-mono">-</span></span>
+                        <span>⚡ <code id="runCommand" class="font-mono">-</code></span>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="settingsDialog" class="dialog-backdrop">
+        <div class="dialog-content max-w-lg">
+            <div class="mb-5 flex items-center justify-between"><h3 class="text-lg font-semibold text-[#111814]">系统设置</h3><button onclick="closeSettings()" class="text-[#657268] hover:text-[#111814]">✕</button></div>
+            <div class="space-y-4">
+                <label class="block text-sm"><span class="mb-1 block font-medium text-[#536158]">Provider Base URL</span><input id="settingsBaseUrl" class="input-area w-full rounded-lg px-3 py-2" /></label>
+                <label class="block text-sm"><span class="mb-1 block font-medium text-[#536158]">Model</span><input id="settingsModel" class="input-area w-full rounded-lg px-3 py-2" /></label>
+                <label class="block text-sm"><span class="mb-1 block font-medium text-[#536158]">API Key</span><input id="settingsApiKey" type="password" placeholder="留空表示保持当前 Key" class="input-area w-full rounded-lg px-3 py-2" /></label>
+                <label class="block text-sm"><span class="mb-1 block font-medium text-[#536158]">数据目录</span><input id="settingsDataDir" class="input-area w-full rounded-lg px-3 py-2" /></label>
+                <p id="settingsMessage" class="text-xs text-[#657268]"></p>
+            </div>
+            <div class="mt-6 flex justify-end gap-2"><button onclick="closeSettings()" class="rounded-lg px-4 py-2 text-sm text-[#536158]">取消</button><button onclick="saveSettings()" class="rounded-lg bg-[#146c5f] px-4 py-2 text-sm font-semibold text-white">保存</button></div>
+        </div>
+    </div>
+
+    <!-- Delete confirmation dialog -->
+    <div id="deleteDialog" class="dialog-backdrop">
+        <div class="dialog-content">
+            <div class="flex items-start gap-3 mb-4">
+                <div class="bg-red-100 rounded-full p-2">
+                    <i data-lucide="trash-2" class="w-5 h-5 text-red-600"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-[#111814]">确认删除</h3>
+                    <p class="text-sm text-[#536158] mt-1">此操作将删除该会话记录以及生成的项目文件，无法恢复。</p>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button id="cancelDeleteBtn" onclick="closeDeleteDialog()" class="px-4 py-2 rounded-lg text-sm font-medium text-[#536158] hover:bg-[#edf1e8] transition-colors">取消</button>
+                <button id="confirmDeleteBtn" onclick="executeDelete()" class="px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition-colors">确认删除</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SESSION_ID = '{session_id}';
+        let refreshInterval;
+        let _selectedStep = null;
+        let _sessionData = null;
+        let _deleteSessionId = null;
+        let _previewRunning = false;
+
+        const WORKFLOW_STEPS = [
+            { id: 'understand_requirements', name: '需求理解', icon: '💡' },
+            { id: 'generate_modules',        name: '模块设计', icon: '📦' },
+            { id: 'generate_fields',         name: '字段设计', icon: '📝' },
+            { id: 'run_validation',          name: '设计验证', icon: '✓' },
+            { id: 'generate_project',        name: '生成项目', icon: '💻' },
+            { id: 'quality_check',           name: '自检与修复', icon: '🛠️' },
+            { id: 'output_result',           name: '完成', icon: '✨' }
+        ];
+        async function openSettings() {
+            document.getElementById('settingsDialog').classList.add('show');
+            const message = document.getElementById('settingsMessage');
+            try {
+                const data = await (await fetch('/api/settings')).json();
+                document.getElementById('settingsBaseUrl').value = data.base_url || '';
+                document.getElementById('settingsModel').value = data.model || '';
+                document.getElementById('settingsDataDir').value = data.data_dir || '';
+                message.textContent = data.api_key_set ? 'API Key 已配置' : 'API Key 尚未配置';
+            } catch (e) { message.textContent = '读取设置失败'; }
+        }
+        function closeSettings() { document.getElementById('settingsDialog').classList.remove('show'); }
+        async function saveSettings() {
+            const message = document.getElementById('settingsMessage');
+            const response = await fetch('/api/settings', { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
+                base_url: document.getElementById('settingsBaseUrl').value,
+                model: document.getElementById('settingsModel').value,
+                api_key: document.getElementById('settingsApiKey').value,
+                data_dir: document.getElementById('settingsDataDir').value,
+            }) });
+            const result = await response.json();
+            message.textContent = result.restart_required ? '已保存，数据目录将在重启后生效' : '已保存';
+            document.getElementById('settingsApiKey').value = '';
+        }
+
+        /* ═══════════════════════════════════════════
+           Init
+           ═══════════════════════════════════════════ */
+        let _initialAutoSelect = true;
+
+        function init() {
+            updateSidebarUI();
+            safeCreateIcons();
+            renderMilestones();
+            loadSession();
+            checkPreviewStatus();
+            refreshInterval = setInterval(() => {
+                loadSession();
+                checkPreviewStatus();
+            }, 1500);
+            loadSidebar();
+        }
+
+        /* ═══════════════════════════════════════════
+           Sidebar with delete
+           ═══════════════════════════════════════════ */
+        const STATUS_CFG = {
+            completed: { dot: 'bg-green-400' }, failed: { dot: 'bg-red-400' },
+            running:   { dot: 'bg-[#146c5f]' }, pending: { dot: 'bg-[#d8dfd5]' },
+        };
+
+        async function loadSidebar() {
+            try {
+                const resp = await fetch('/api/sessions?limit=50');
+                renderSidebar((await resp.json()).sessions || []);
+            } catch (e) { console.error(e); }
+        }
+
+        function renderSidebar(sessions) {
+            const c = document.getElementById('sessionList');
+            if (!sessions.length) { c.innerHTML = '<p class="text-center text-[#657268] text-sm py-8">暂无历史记录</p>'; return; }
+            c.innerHTML = sessions.map(s => {
+                const cfg = STATUS_CFG[s.status] || STATUS_CFG.pending;
+                const time = s.created_at ? s.created_at.slice(5,16).replace('T',' ') : '';
+                const name = s.project_name || s.user_input.slice(0,20) + '...';
+                const isActive = s.id === SESSION_ID || s.id.startsWith(SESSION_ID);
+                const isCurrent = s.id === SESSION_ID;
+                const delOnclick = isCurrent ? '' : `event.preventDefault(); showDeleteDialog('${s.id}', '${escHtml(name).replace(/'/g, "\\'")}')`;
+                const delBtnAttrs = isCurrent ? 'disabled style="opacity:0.3;cursor:not-allowed;" title="无法删除当前会话"' : 'title="删除"';
+                return `<a href="/session/${s.id}" class="session-item flex items-center gap-2 px-3 py-2.5 rounded-lg group relative ${isActive?'active-session':''}">
+                    <div class="mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}"></div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-[#111814] truncate">${escHtml(name)}</div>
+                        <div class="text-xs text-[#657268] mt-0.5">${time}</div>
+                    </div>
+                    <button onclick="${delOnclick}"
+                        class="delete-btn flex-shrink-0 p-1.5 rounded-md text-[#657268] hover:text-red-600 transition-colors"
+                        ${delBtnAttrs}>
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    </button>
+                </a>`;
+            }).join('');
+            safeCreateIcons();
+        }
+
+        function escHtml(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+        /* ═══════════════════════════════════════════
+           Delete Dialog
+           ═══════════════════════════════════════════ */
+        function showDeleteDialog(id, name) {
+            _deleteSessionId = id;
+            document.getElementById('deleteDialog').classList.add('show');
+        }
+
+        function closeDeleteDialog() {
+            _deleteSessionId = null;
+            document.getElementById('deleteDialog').classList.remove('show');
+        }
+
+        async function executeDelete() {
+            if (!_deleteSessionId) return;
+            const btn = document.getElementById('confirmDeleteBtn');
+            btn.textContent = '删除中...';
+            btn.disabled = true;
+            try {
+                const resp = await fetch(`/api/sessions/${_deleteSessionId}`, { method: 'DELETE' });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                closeDeleteDialog();
+                if (_deleteSessionId === SESSION_ID) {
+                    window.location.href = '/';
+                } else {
+                    loadSidebar();
+                }
+            } catch (e) { alert('删除失败: ' + e.message); }
+            finally { btn.textContent = '确认删除'; btn.disabled = false; }
+        }
+
+        /* ═══════════════════════════════════════════
+           Milestones (unchanged)
+           ═══════════════════════════════════════════ */
+        function renderMilestones() {
+            const bar = document.getElementById('milestoneBar');
+            let html = '';
+            WORKFLOW_STEPS.forEach((step, i) => {
+                html += `<div class="milestone" data-step="${step.id}" onclick="selectStep('${step.id}')">
+                    <div class="milestone-dot"></div>
+                    <div class="milestone-text">${step.name}</div>
+                </div>`;
+                if (i < WORKFLOW_STEPS.length - 1) html += `<div class="milestone-bar"></div>`;
+            });
+            bar.innerHTML = html;
+        }
+
+        function updateMilestones(data) {
+            const history = data.step_history || [];
+            const current = data.current_step;
+            document.querySelectorAll('.milestone').forEach((el, i) => {
+                const sid = WORKFLOW_STEPS[i].id;
+                el.classList.remove('done', 'running');
+                if (milestoneWasReached(sid, history)) el.classList.add('done');
+                else if (milestoneIdForStep(current) === sid) el.classList.add('running');
+            });
+            document.querySelectorAll('.milestone-bar').forEach((bar, i) => {
+                const a = milestoneWasReached(WORKFLOW_STEPS[i].id, history);
+                const b = milestoneWasReached(WORKFLOW_STEPS[i+1].id, history) || milestoneIdForStep(current) === WORKFLOW_STEPS[i+1].id;
+                bar.classList.toggle('done', a && b);
+            });
+            if (_selectedStep) highlightMilestone(_selectedStep);
+        }
+
+        function formatDuration(milliseconds) {
+            if (!Number.isFinite(milliseconds)) return '';
+            if (milliseconds < 1000) return `${Math.max(0, Math.round(milliseconds))}ms`;
+            const seconds = milliseconds / 1000;
+            if (seconds < 60) return `${seconds.toFixed(1).replace(/\.0$/, '')}s`;
+            const minutes = Math.floor(seconds / 60);
+            return `${minutes}m ${(seconds % 60).toFixed(1).replace(/\.0$/, '')}s`;
+        }
+
+        function formatTaskDuration(data) {
+            if (!data?.created_at) return '';
+            const started = Date.parse(data.created_at);
+            const ended = data.finished_at ? Date.parse(data.finished_at) : Date.now();
+            if (!Number.isFinite(started) || !Number.isFinite(ended)) return '';
+            return `总耗时 ${formatDuration(Math.max(0, ended - started))}`;
+        }
+
+        function updateTaskDuration(data) {
+            const element = document.getElementById('taskDuration');
+            if (element) element.textContent = formatTaskDuration(data);
+        }
+
+        function milestoneIdForStep(stepId) {
+            return ['test_launch', 'auto_fix'].includes(stepId) ? 'quality_check' : stepId;
+        }
+
+        function milestoneWasReached(milestoneId, history) {
+            if (milestoneId === 'quality_check') {
+                return history.some(step => ['test_launch', 'auto_fix'].includes(step));
+            }
+            return history.some(step => step === milestoneId);
+        }
+
+        function highlightMilestone(stepId) {
+            document.querySelectorAll('.milestone').forEach(el => el.classList.remove('selected'));
+            const el = document.querySelector(`.milestone[data-step="${stepId}"]`);
+            if (el) el.classList.add('selected');
+        }
+
+        /* ═══════════════════════════════════════════
+           Step Detail (unchanged)
+           ═══════════════════════════════════════════ */
+        function selectStep(stepId) {
+            _selectedStep = stepId;
+            highlightMilestone(stepId);
+            renderStepDetail(stepId);
+        }
+
+        function renderStepDetail(stepId) {
+            const details = _sessionData?.step_details || {};
+            const detail = stepId === 'quality_check' ? null : details[stepId];
+            const stepMeta = WORKFLOW_STEPS.find(s => s.id === stepId);
+            document.getElementById('detailPanel').classList.remove('hidden');
+            const title = document.getElementById('detailTitle');
+            const summary = document.getElementById('detailSummary');
+            const duration = document.getElementById('detailDuration');
+            const content = document.getElementById('detailContent');
+            if (stepId === 'quality_check') {
+                const entries = Object.entries(details)
+                    .filter(([key]) => key === 'test_launch' || key.startsWith('test_launch_') || key.startsWith('auto_fix_'))
+                    .filter(([key]) => key !== 'test_launch' || !Object.keys(details).some(name => name.startsWith('test_launch_')))
+                    .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }));
+                title.textContent = `${stepMeta.icon} ${stepMeta.name}`;
+                summary.textContent = `${entries.length} 个自检/修复记录`;
+                const durationMs = entries.reduce((sum, [, item]) => sum + (Number(item.duration_ms) || 0), 0);
+                duration.textContent = durationMs ? formatDuration(durationMs) : '';
+                content.innerHTML = entries.length ? entries.map(([key, item], index) => `
+                    <div class="detail-section ${item.error ? 'error' : ''}">
+                        <h4 class="text-sm font-semibold ${item.error ? 'text-red-700' : 'text-[#536158]'} mb-2">第 ${index + 1} 次 · ${escHtml(item.title || key)}</h4>
+                        <p class="text-sm text-[#657268] mb-2">${escHtml(item.summary || '')}</p>
+                        ${item.error ? `<div class="detail-pre text-red-700">${escHtml(item.error)}</div>` : ''}
+                        ${item.data ? renderStepData(key.startsWith('auto_fix') ? 'auto_fix' : 'test_launch', item.data) : ''}
+                    </div>`).join('') : '<p class="text-[#657268] text-sm">暂无自检或修复记录</p>';
+                return;
+            }
+            if (!detail) {
+                title.textContent = `${stepMeta.icon} ${stepMeta.name}`;
+                summary.textContent = '该步骤尚未执行或无详细记录';
+                duration.textContent = '';
+                content.innerHTML = '<p class="text-[#657268] text-sm">等待步骤执行后查看详情</p>';
+                return;
+            }
+            title.textContent = `${stepMeta.icon} ${stepMeta.name}`;
+            if (stepId === 'generate_fields') {
+                const fieldGroups = detail.data || {};
+                const moduleCount = Object.keys(fieldGroups).length;
+                const fieldCount = Object.values(fieldGroups).reduce((sum, fields) => sum + (fields || []).length, 0);
+                summary.textContent = `共 ${moduleCount} 个模块，${fieldCount} 个字段`;
+            } else if (stepId === 'generate_project') {
+                summary.textContent = `生成 ${(detail.data?.files || []).length} 个文件`;
+            } else {
+                summary.textContent = detail.summary || '';
+            }
+            duration.textContent = stepId === 'output_result'
+                ? formatTaskDuration(_sessionData)
+                : (detail.duration_ms != null ? formatDuration(Number(detail.duration_ms)) : '');
+            let html = '';
+            if (detail.data) {
+                html += `<div class="detail-section">${renderStepData(stepId, detail.data)}</div>`;
+            }
+            if (detail.error) {
+                html += `<div class="detail-section error"><h4 class="text-sm font-semibold text-red-700 mb-2">❌ 错误</h4><div class="detail-pre text-red-700">${escHtml(detail.error)}</div></div>`;
+            }
+            content.innerHTML = html || '<p class="text-[#657268] text-sm">无详细信息</p>';
+
+        }
+
+        function renderTable(headers, rows) {
+            if (!rows.length) return '<p class="text-sm text-[#657268]">暂无数据</p>';
+            return `<div class="overflow-x-auto rounded-lg border border-[#e5e7eb]"><table class="w-full text-left text-sm"><thead class="bg-[#f7f8f4]"><tr>${headers.map(h => `<th class="px-3 py-2 font-semibold text-[#536158]">${escHtml(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr class="border-t border-[#edf1e8]">${row.map(cell => `<td class="px-3 py-2 text-[#374151]">${escHtml(cell == null ? '' : String(cell))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+        }
+
+        function renderFieldTable(fields) {
+            if (!fields.length) return '<p class="text-sm text-[#657268]">暂无字段</p>';
+            return `<div class="overflow-x-auto rounded-lg border border-[#e5e7eb]"><table class="w-full text-left text-sm"><thead class="bg-[#f7f8f4]"><tr><th class="px-3 py-2 font-semibold text-[#536158]">字段</th><th class="px-3 py-2 font-semibold text-[#536158]">类型</th><th class="px-3 py-2 text-center font-semibold text-[#536158]">必填</th><th class="px-3 py-2 text-center font-semibold text-[#536158]">可搜索</th></tr></thead><tbody>${fields.map(field => `<tr class="border-t border-[#edf1e8]"><td class="px-3 py-2 text-[#374151]">${escHtml(field.label || field.name)}</td><td class="px-3 py-2"><code class="rounded bg-[#f1f5f9] px-1.5 py-0.5 text-xs text-[#475569]">${escHtml(field.type || '')}</code></td><td class="px-3 py-2 text-center font-semibold text-[#146c5f]">${field.required ? 'Y' : ''}</td><td class="px-3 py-2 text-center font-semibold text-[#146c5f]">${(field.can_search ?? field.canSearch) ? 'Y' : ''}</td></tr>`).join('')}</tbody></table></div>`;
+        }
+
+        function renderFileTree(files) {
+            const root = { children: {} };
+            (files || []).forEach(file => {
+                let node = root;
+                file.split('/').filter(Boolean).forEach(part => {
+                    node.children[part] ||= { children: {} };
+                    node = node.children[part];
+                });
+            });
+
+            function walk(node, prefix) {
+                const entries = Object.entries(node.children).sort(([a], [b]) => a.localeCompare(b));
+                return entries.map(([name, child], index) => {
+                    const last = index === entries.length - 1;
+                    const branch = last ? '└── ' : '├── ';
+                    const hasChildren = Object.keys(child.children).length > 0;
+                    const line = `${prefix}${branch}${name}${hasChildren ? '/' : ''}`;
+                    const nextPrefix = prefix + (last ? '    ' : '│   ');
+                    return line + (hasChildren ? `\n${walk(child, nextPrefix)}` : '');
+                }).join('\n');
+            }
+
+            return `<pre class="detail-pre">${escHtml(walk(root, ''))}</pre>`;
+        }
+
+        function renderStepData(stepId, data) {
+            if (stepId === 'understand_requirements') {
+                const constraints = [
+                    ['模块数量上限', data.module_count_max || '未指定'],
+                    ['字段数量上限', data.field_count_max || '未指定']
+                ];
+                return `<div class="space-y-4"><div><div class="mb-1 text-xs font-semibold text-[#657268]">原始需求</div><div class="rounded-lg bg-[#f7f8f4] px-3 py-2 text-sm text-[#374151]">${escHtml(data.user_input || '')}</div></div><div><div class="mb-1 text-xs font-semibold text-[#657268]">功能规划</div><ul class="list-disc space-y-1 pl-5 text-sm text-[#374151]">${(data.features || []).map(item => `<li>${escHtml(item)}</li>`).join('') || '<li>暂无</li>'}</ul></div><div><div class="mb-1 text-xs font-semibold text-[#657268]">条件约束</div><ul class="space-y-1 text-sm text-[#374151]">${constraints.map(([label, value]) => `<li><span class="font-semibold text-[#536158]">${escHtml(label)}：</span>${escHtml(value)}</li>`).join('')}</ul></div></div>`;
+            }
+            if (stepId === 'generate_modules') {
+                const modules = Array.isArray(data) ? data : (data.modules || []);
+                return renderTable(['模块', '说明'], modules.map(item => [item.label || item.name, item.description || '']));
+            }
+            if (stepId === 'generate_fields') {
+                const sections = Object.entries(data || {}).map(([module, fields]) => `<div class="mb-4 inline-block w-full break-inside-avoid align-top"><div class="mb-2 text-sm font-semibold text-[#536158]">${escHtml(module)}</div>${renderFieldTable(fields || [])}</div>`);
+                return sections.length ? `<div class="columns-1 gap-4 md:columns-2">${sections.join('')}</div>` : '<p class="text-sm text-[#657268]">暂无字段</p>';
+            }
+            if (stepId === 'run_validation') {
+                const issues = data.issues || [];
+                return `<div class="space-y-3"><div class="text-sm text-[#374151]">检查模块：${data.module_count || 0} 个</div>${issues.length ? renderTable(['类型', '问题'], issues.map(item => [item.type, item.message])) : '<div class="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">全部通过</div>'}</div>`;
+            }
+            if (stepId === 'generate_project') {
+                const files = data.files || [];
+                return `<div class="space-y-3"><div class="rounded-lg bg-[#f7f8f4] px-3 py-2 text-sm text-[#374151]"><span class="font-semibold">项目路径：</span>${escHtml(data.project_path || '')}</div>${files.length ? renderFileTree(files) : '<p class="text-sm text-[#657268]">暂无文件</p>'}</div>`;
+            }
+            if (stepId === 'test_launch') {
+                const labels = { required_files: '文件检查', python_compile: '项目编译' };
+                const checks = data.checks || [];
+                return `<ul class="space-y-2 text-sm text-[#374151]">${checks.map(check => `<li>✅ ${escHtml(labels[check] || check)}</li>`).join('') || '<li class="text-[#657268]">暂无检查记录</li>'}</ul>`;
+            }
+            if (stepId === 'auto_fix') {
+                return `<div class="space-y-3">${data.analysis ? `<div><div class="mb-1 text-xs font-semibold text-[#657268]">原因分析</div><div class="text-sm text-[#374151]">${escHtml(data.analysis)}</div></div>` : ''}${data.file_to_fix ? `<div class="text-sm text-[#374151]"><span class="font-semibold">涉及文件：</span>${escHtml(data.file_to_fix)}</div>` : ''}${data.verification ? `<div><div class="mb-1 text-xs font-semibold text-[#657268]">验证方式</div><div class="text-sm text-[#374151]">${escHtml(data.verification)}</div></div>` : ''}</div>`;
+            }
+            if (stepId === 'output_result') {
+                const session = _sessionData || {};
+                const project = session.project_config?.project || {};
+                const modules = session.modules || data.modules || [];
+                const moduleNames = modules.map(module => typeof module === 'string' ? module : (module.label || module.name)).filter(Boolean);
+                return `<div class="grid gap-3 text-sm text-[#374151]"><div><span class="font-semibold text-[#536158]">项目名称：</span>${escHtml(project.name || session.project_name || '信息系统')}</div><div><span class="font-semibold text-[#536158]">项目模块：</span>${moduleNames.length ? moduleNames.map(name => `<span class="mr-2 inline-flex rounded-full bg-[#edf1e8] px-2.5 py-1 text-xs text-[#146c5f]">${escHtml(name)}</span>`).join('') : '暂无模块'}</div><div><span class="font-semibold text-[#536158]">项目地址：</span><span class="font-mono text-xs">${escHtml(data.project_path || session.project_path || '')}</span></div><div class="flex items-center gap-2"><span class="font-semibold text-[#536158]">状态：</span><span class="inline-flex rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">${session.status === 'completed' ? '已完成' : (session.status || '未知')}</span></div></div>`;
+            }
+            return `<div class="detail-pre">${syntaxHighlight(data)}</div>`;
+        }
+
+        function syntaxHighlight(obj) {
+            const json = JSON.stringify(obj, null, 2);
+            return escHtml(json).replace(/("(\\\\u[a-zA-Z0-9]{4}|\\\\[^u]|[^\\\\"])*"(\s*:)?|\b(true|false|null)\b|-?\\d+(?:\\.\\d*)?(?:[eE][+\-]?\\d+)?)/g,
+                match => {
+                    let cls = 'color:#164'; if (/^"/.test(match)) { cls = /:$/.test(match) ? 'color:#a21;font-weight:bold' : 'color:#0736a0'; }
+                    else if (/true|false/.test(match)) cls = 'color:#a11'; else if (/null/.test(match)) cls = 'color:#888';
+                    return `<span style="${cls}">${match}</span>`;
+                });
+        }
+
+        /* ═══════════════════════════════════════════
+           Session polling (unchanged)
+           ═══════════════════════════════════════════ */
+        async function loadSession() {
+            try {
+                const resp = await fetch('/api/sessions/' + SESSION_ID);
+                const data = await resp.json();
+                if (data.error) {
+                    _sessionData = data;
+                    updateStatus('failed');
+                    updateMilestones(data);
+                    clearInterval(refreshInterval);
+                    if (!_selectedStep) selectStep('output_result');
+                    return;
+                }
+                _sessionData = data;
+                const name = data.project_name || data.user_input?.slice(0, 30) || 'Session';
+                document.getElementById('navSessionName').textContent = name;
+                document.title = name + ' - OMA';
+                updateStatus(data.status);
+                updateTaskDuration(data);
+                updateMilestones(data);
+                updatePreviewButton();
+                if (data.status === 'completed') {
+                    clearInterval(refreshInterval);
+                } else if (data.status === 'failed') {
+                    clearInterval(refreshInterval);
+                }
+                if (_selectedStep) {
+                    renderStepDetail(_selectedStep);
+                } else if (_initialAutoSelect) {
+                    const steps = data.step_history || [];
+                    const rawTarget = data.status === 'running' ? data.current_step : steps[steps.length - 1];
+                    const target = milestoneIdForStep(rawTarget);
+                    if (target) {
+                        _initialAutoSelect = false;
+                        selectStep(target);
+                    } else if (steps.length === 0 && !data.current_step) {
+                        _initialAutoSelect = false;
+                        selectStep(WORKFLOW_STEPS[0].id);
+                    }
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function updateStatus(status) {
+            const badge = document.getElementById('statusBadge');
+            badge.className = 'status-badge ' + status;
+            badge.textContent = { pending:'等待中', running:'进行中', completed:'已完成', failed:'失败' }[status] || status;
+            badge.classList.toggle('hidden', status === 'completed');
+            const actions = document.getElementById('headerActions');
+            if (actions) {
+                actions.classList.toggle('hidden', status !== 'completed');
+                actions.classList.toggle('inline-flex', status === 'completed');
+                safeCreateIcons();
+            }
+        }
+
+        /* ═══════════════════════════════════════════
+           Preview
+           ═══════════════════════════════════════════ */
+        async function checkPreviewStatus() {
+            try {
+                const resp = await fetch(`/api/sessions/${SESSION_ID}/preview`);
+                const status = await resp.json();
+                _previewRunning = status.running || false;
+                updatePreviewButton();
+            } catch (e) { console.error(e); }
+        }
+
+        function updatePreviewButton() {
+            const btn = document.getElementById('previewBtn') || { disabled: true, innerHTML: '', onclick: null };
+            const headerBtn = document.getElementById('headerPreviewBtn');
+            const manualBtn = document.getElementById('manualBtn');
+            // Both buttons live inside the output_result detail panel — if that
+            // step isn't currently selected, there's nothing to update.
+            if (!btn && !headerBtn && !manualBtn) return;
+            if (_previewRunning) {
+                btn.disabled = false;
+                btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg><span>停止</span>`;
+                btn.onclick = stopPreview;
+                if (manualBtn) {
+                    const session = _sessionData;
+                    manualBtn.disabled = !(session && session.status === 'completed');
+                }
+            } else {
+                const session = _sessionData;
+                const canPreview = session && session.status === 'completed';
+                btn.disabled = !canPreview;
+                if (!canPreview) {
+                    btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg><span>预览系统</span>`;
+                }
+                btn.onclick = launchPreview;
+                if (manualBtn) {
+                    manualBtn.disabled = !canPreview;
+                }
+            }
+            if (headerBtn) {
+                const session = _sessionData;
+                const canPreview = session && session.status === 'completed';
+                headerBtn.disabled = !canPreview;
+                headerBtn.innerHTML = _previewRunning
+                    ? '<i data-lucide="square" class="h-3.5 w-3.5"></i><span>停止</span>'
+                    : '<i data-lucide="eye" class="h-3.5 w-3.5"></i><span>预览</span>';
+                headerBtn.onclick = _previewRunning ? stopPreview : launchPreview;
+                safeCreateIcons();
+            }
+        }
+
+        async function generateManual() {
+            const btn = document.getElementById('manualBtn');
+            const spinner = document.getElementById('manualSpinner');
+            if (!btn || btn.disabled) return;
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+            try {
+                const resp = await fetch(`/api/sessions/${SESSION_ID}/manual`, { method: 'POST' });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+                    alert('生成手册失败: ' + (err.detail || ''));
+                    return;
+                }
+                const result = await resp.json();
+                // Trigger browser download
+                const a = document.createElement('a');
+                a.href = result.manual_url;
+                a.download = result.manual_filename || 'manual.docx';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                // Refresh step details to show new entry
+                await loadSession();
+            } catch (e) {
+                alert('生成手册出错: ' + e.message);
+            } finally {
+                spinner.classList.add('hidden');
+                btn.disabled = false;
+            }
+        }
+
+        async function downloadProject() {
+            const btn = document.getElementById('headerDownloadBtn') || document.getElementById('downloadBtn');
+            const spinner = document.getElementById('downloadSpinner');
+            if (!btn || btn.disabled) return;
+            btn.disabled = true;
+            if (spinner) spinner.classList.remove('hidden');
+            try {
+                const resp = await fetch(`/api/sessions/${SESSION_ID}/project/zip`);
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+                    alert('下载项目失败: ' + (err.detail || ''));
+                    return;
+                }
+                const blob = await resp.blob();
+                // Parse filename from Content-Disposition (RFC 5987 filename*=UTF-8'')
+                let filename = 'project.zip';
+                const cd = resp.headers.get('content-disposition') || '';
+                const m = cd.match(/filename\*=UTF-8''([^;]+)/);
+                if (m) filename = decodeURIComponent(m[1]);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                alert('下载项目出错: ' + e.message);
+            } finally {
+                if (spinner) spinner.classList.add('hidden');
+                btn.disabled = false;
+            }
+        }
+
+        async function launchPreview() {
+            const btn = document.getElementById('previewBtn') || document.getElementById('headerPreviewBtn');
+            const spinner = document.getElementById('previewSpinner');
+            if (!btn) return;
+            if (spinner) spinner.classList.remove('hidden');
+            btn.disabled = true;
+            try {
+                const resp = await fetch(`/api/sessions/${SESSION_ID}/preview`, { method: 'POST' });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+                    alert('启动预览系统失败: ' + (err.detail || ''));
+                    return;
+                }
+                const result = await resp.json();
+                const displayUrl = result.public_url || result.preview_url;
+                _previewRunning = true;
+                document.getElementById('previewSection').classList.remove('hidden');
+                document.getElementById('projectPath').textContent = result.project_path;
+                document.getElementById('previewLink').href = displayUrl;
+                document.getElementById('runCommand').textContent = `uv run python run.py --port ${result.port}`;
+                setTimeout(() => {
+                    document.getElementById('previewFrame').src = displayUrl;
+                    document.getElementById('previewUrl').textContent = displayUrl;
+                }, 2500);
+                updatePreviewButton();
+            } catch (e) { alert('启动预览系统失败: ' + e.message); }
+            finally {
+                const sp = document.getElementById('previewSpinner');
+                if (sp) sp.classList.add('hidden');
+            }
+        }
+
+        async function stopPreview() {
+            const buttons = [document.getElementById('previewBtn'), document.getElementById('headerPreviewBtn')].filter(Boolean);
+            buttons.forEach(btn => {
+                btn.disabled = true;
+                const label = btn.querySelector('span');
+                if (label) label.textContent = '停止中...';
+            });
+            try {
+                const resp = await fetch(`/api/sessions/${SESSION_ID}/preview`, { method: 'DELETE' });
+                if (!resp.ok) console.warn('Stop preview returned', resp.status);
+            } catch (e) {
+                console.error('Stop preview failed:', e);
+            } finally {
+                _previewRunning = false;
+                const frame = document.getElementById('previewFrame');
+                if (frame) frame.src = 'about:blank';
+                document.getElementById('previewSection').classList.add('hidden');
+                document.getElementById('detailPanel').classList.remove('hidden');
+                updatePreviewButton();
+                await checkPreviewStatus();
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>灯神 · Wishlamp</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.04);
+        }
+
+        .input-area {
+            background: #fafbfc;
+            border: 2px solid #e5e7eb;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .input-area:focus {
+            outline: none;
+            border-color: #146c5f;
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(20, 108, 95, 0.12);
+        }
+
+        .generate-btn {
+            background: linear-gradient(135deg, #146c5f 0%, #1e8fb0 100%);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        .generate-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        .generate-btn:hover::before { left: 100%; }
+        .generate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(20, 108, 95, 0.28);
+        }
+        .generate-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .generate-btn:disabled:hover { transform: none; box-shadow: none; }
+
+        .session-item {
+            transition: all 0.15s ease;
+        }
+        .session-item:hover {
+            background: #f3f4ff;
+        }
+        .session-item .delete-btn {
+            opacity: 0;
+            transition: all 0.2s ease;
+        }
+        .session-item:hover .delete-btn {
+            opacity: 1;
+        }
+        .session-item .delete-btn:hover {
+            background: #fee2e2;
+            color: #ef4444;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up { animation: fadeInUp 0.4s ease forwards; }
+
+        /* scrollbar */
+        .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+        .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+
+        /* Delete confirmation dialog */
+        .dialog-backdrop {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none; align-items: center; justify-content: center;
+            z-index: 9999;
+        }
+        .dialog-backdrop.show { display: flex; }
+        .dialog-content {
+            background: white; border-radius: 12px; padding: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            max-width: 400px; width: 90%;
+        }
+        .app-shell { background: #f7f8f4; }
+        .app-sidebar {
+            width: 260px;
+            transition: width 200ms ease, transform 200ms ease-in-out;
+        }
+        .sidebar-label,
+        .sidebar-section {
+            transition: opacity 160ms ease;
+        }
+        .sidebar-icon-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            color: #657268;
+            transition: all 0.15s ease;
+        }
+        .sidebar-icon-btn:hover { background: #edf1e8; color: #111814; }
+        .mobile-sidebar-backdrop { display: none; }
+        @media (min-width: 1024px) {
+            .app-sidebar.is-collapsed { width: 56px; }
+            .app-sidebar.is-collapsed .sidebar-label,
+            .app-sidebar.is-collapsed .sidebar-section { display: none; }
+            .app-sidebar.is-collapsed .sidebar-action { justify-content: center; padding-left: 0; padding-right: 0; }
+            .app-sidebar.is-collapsed .brand-button { width: 40px; height: 40px; padding: 0; }
+            .app-sidebar.is-collapsed .brand-button > span { width: 40px; height: 40px; }
+            .app-sidebar.is-collapsed .sidebar-create-btn { width: 40px; height: 40px; padding: 0; justify-content: center; }
+            .app-sidebar.is-collapsed .sidebar-top { align-items: center; }
+            .app-sidebar.is-collapsed .sidebar-footer { flex-direction: column; align-items: center; gap: 4px; }
+        }
+        @media (max-width: 1023px) {
+            .app-sidebar {
+                position: fixed;
+                inset: 0 auto 0 0;
+                z-index: 40;
+                transform: translateX(-100%);
+                box-shadow: 24px 0 60px rgba(17,24,20,0.18);
+            }
+            .app-sidebar.is-mobile-open { transform: translateX(0); }
+            .mobile-sidebar-backdrop {
+                position: fixed;
+                inset: 0;
+                z-index: 30;
+                background: rgba(17,24,20,0.36);
+            }
+            .mobile-sidebar-backdrop.is-visible { display: block; }
+        }
+        .dark body,
+        .dark .app-shell { background: #0b1220; color: #f8fafc; }
+        .dark .app-sidebar,
+        .dark .dialog-content,
+        .dark .sidebar-icon-btn:hover { background: #1f2937; color: #f8fafc; }
+        .dark .sidebar-icon-btn,
+        .dark .sidebar-action { color: #e5e7eb; }
+        .dark .app-shell main { background: #0b1220; color: #f8fafc; }
+        .dark .app-shell .bg-white { background: #111827 !important; color: #f8fafc; }
+        .dark .app-shell [class*="bg-[#f7f8f4]"] { background: #111827 !important; }
+        .dark .app-shell [class*="bg-[#edf1e8]"] { background: #1f2937 !important; }
+        .dark .app-shell [class*="border-[#d8dfd5]"],
+        .dark .app-shell [class*="border-[#edf1e8]"] { border-color: #283548 !important; }
+        .dark .app-shell [class*="text-[#111814]"],
+        .dark .app-shell [class*="text-[#536158]"] { color: #f8fafc !important; }
+        .dark .app-shell [class*="text-[#657268]"] { color: #a8b3c2 !important; }
+        .dark .glass-card { background: #111827; border-color: #283548; box-shadow: 0 20px 60px rgba(0,0,0,0.28); }
+        .dark .input-area { background: #111827; border-color: #334155; color: #f8fafc; }
+        .dark .input-area:focus { background: #0f172a; border-color: #2aa892; }
+        .dark .input-area::placeholder { color: #64748b; }
+        .dark .session-item:hover { background: #1f2937; }
+        .dark .session-item.active-session { background: #26334a; }
+        .dark .session-item .delete-btn:hover { background: #3f2934; color: #fca5a5; }
+    </style>
+
+    <script>
+        function safeCreateIcons() {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons();
+            }
+        }
+        function toggleTheme() {
+            const nextDark = !document.documentElement.classList.contains('dark');
+            document.documentElement.classList.toggle('dark', nextDark);
+            localStorage.setItem('theme', nextDark ? 'dark' : 'light');
+            updateThemeIcon();
+        }
+        function updateThemeIcon() {
+            const icon = document.getElementById('themeIcon');
+            if (!icon) return;
+            icon.setAttribute('data-lucide', document.documentElement.classList.contains('dark') ? 'sun' : 'moon');
+            safeCreateIcons();
+        }
+        let sidebarCollapsed = localStorage.getItem('info-agent:sidebar-collapsed') === 'true';
+        let sidebarOpen = false;
+        function toggleSidebarCollapsed() {
+            if (window.innerWidth < 1024) {
+                sidebarOpen = !sidebarOpen;
+                updateSidebarUI();
+                return;
+            }
+            sidebarCollapsed = !sidebarCollapsed;
+            localStorage.setItem('info-agent:sidebar-collapsed', String(sidebarCollapsed));
+            updateSidebarUI();
+        }
+        function openMobileSidebar() {
+            sidebarOpen = true;
+            updateSidebarUI();
+        }
+        function closeMobileSidebar() {
+            sidebarOpen = false;
+            updateSidebarUI();
+        }
+        function updateSidebarUI() {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('mobileSidebarBackdrop');
+            if (!sidebar) return;
+            sidebar.classList.toggle('is-collapsed', window.innerWidth >= 1024 && sidebarCollapsed);
+            sidebar.classList.toggle('is-mobile-open', window.innerWidth < 1024 && sidebarOpen);
+            if (backdrop) backdrop.classList.toggle('is-visible', window.innerWidth < 1024 && sidebarOpen);
+        }
+        const storedTheme = localStorage.getItem('theme');
+        if (storedTheme === 'dark' || (!storedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        }
+        window.addEventListener('resize', updateSidebarUI);
+    </script>
+</head>
+<body class="h-screen bg-[#f7f8f4]">
+    <div class="app-shell flex h-screen overflow-hidden">
+        <div id="mobileSidebarBackdrop" class="mobile-sidebar-backdrop" onclick="closeMobileSidebar()"></div>
+
+        <!-- Sidebar -->
+        <aside id="sidebar" class="app-sidebar flex-shrink-0 bg-white border-r border-[#d8dfd5] flex flex-col overflow-visible">
+            <div class="sidebar-top flex flex-col gap-3 px-3 py-3 border-b border-[#edf1e8]">
+                <div class="flex items-center gap-2 border-b border-[#edf1e8] pb-3">
+                    <button onclick="toggleSidebarCollapsed()" class="sidebar-action brand-button flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-2 text-left text-[#111814] hover:bg-[#edf1e8] transition-colors" title="灯神 · Wishlamp">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#146c5f] text-white shadow-sm">
+                            <i data-lucide="loader" class="h-4 w-4"></i>
+                        </span>
+                        <span class="sidebar-label truncate text-sm font-bold">灯神 · Wishlamp</span>
+                    </button>
+                    <button onclick="toggleSidebarCollapsed()" class="sidebar-label hidden lg:inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#657268] hover:bg-[#edf1e8]" title="Collapse sidebar">
+                        <i data-lucide="chevrons-left" class="h-4 w-4"></i>
+                    </button>
+                </div>
+                <a href="/" class="sidebar-action sidebar-create-btn flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-[#111814] hover:bg-[#edf1e8] transition-colors" title="新任务">
+                    <i data-lucide="plus" class="h-4 w-4 shrink-0"></i>
+                    <span class="sidebar-label">新任务</span>
+                </a>
+            </div>
+            <div class="sidebar-section px-4 py-3">
+                <h2 class="text-xs font-semibold text-[#536158] uppercase tracking-wider">历史记录</h2>
+            </div>
+            <div id="sessionList" class="sidebar-section flex-1 overflow-y-auto sidebar-scroll px-2 pb-2 space-y-1">
+            </div>
+            <div class="sidebar-footer border-t border-[#edf1e8] p-3 flex justify-start">
+                <button onclick="openSettings()" title="系统设置" class="sidebar-icon-btn h-9 w-9">
+                    <i data-lucide="settings" class="h-4 w-4"></i>
+                </button>
+                <button onclick="toggleTheme()" title="切换深色/浅色模式" class="sidebar-icon-btn h-9 w-9">
+                    <i id="themeIcon" data-lucide="moon" class="h-4 w-4"></i>
+                </button>
+                <a href="/magic" title="进入魔法工坊" class="sidebar-icon-btn h-9 w-9"><i data-lucide="wand-sparkles" class="h-4 w-4"></i></a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex items-center justify-center p-6 overflow-y-auto relative">
+            <button onclick="openMobileSidebar()" class="absolute left-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#d8dfd5] bg-white text-[#536158] shadow-sm lg:hidden" title="Open sidebar">
+                <i data-lucide="menu" class="h-5 w-5"></i>
+            </button>
+            <div class="w-full max-w-2xl animate-fade-in-up">
+                <div class="text-center mb-8">
+                    <h1 class="text-4xl font-bold text-[#111814] mb-2">万物生</h1>
+                    <p class="text-[#657268]">用几句话描述业务需求，AI 会生成可预览系统、可调整的内部信息系统</p>
+                </div>
+                <div class="p-0">
+                    <div class="relative">
+                    <textarea id="userInput"
+                        rows="5"
+                        class="input-area w-full px-4 py-3 pb-14 rounded-xl text-[#111814] resize-none text-sm"
+                        placeholder="办公用品管理系统，包含物品档案、领用记录、库存数量、部门、申请人和审批状态..."></textarea>
+                    <button id="sendBtn" onclick="generate()" disabled aria-label="发送需求" title="发送需求" class="absolute bottom-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#d8dfd5] text-white transition-colors disabled:cursor-not-allowed">
+                        <i data-lucide="arrow-up" class="h-4 w-4"></i>
+                    </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="settingsDialog" class="dialog-backdrop">
+        <div class="dialog-content max-w-lg">
+            <div class="mb-5 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-[#111814]">系统设置</h3>
+                <button onclick="closeSettings()" class="text-[#657268] hover:text-[#111814]">✕</button>
+            </div>
+            <div class="space-y-4">
+                <label class="block text-sm"><span class="mb-1 block font-medium text-[#536158]">Provider Base URL</span><input id="settingsBaseUrl" class="input-area w-full rounded-lg px-3 py-2" /></label>
+                <label class="block text-sm"><span class="mb-1 block font-medium text-[#536158]">Model</span><input id="settingsModel" class="input-area w-full rounded-lg px-3 py-2" /></label>
+                <label class="block text-sm"><span class="mb-1 block font-medium text-[#536158]">API Key</span><input id="settingsApiKey" type="password" placeholder="留空表示保持当前 Key" class="input-area w-full rounded-lg px-3 py-2" /></label>
+                <label class="block text-sm"><span class="mb-1 block font-medium text-[#536158]">数据目录</span><input id="settingsDataDir" class="input-area w-full rounded-lg px-3 py-2" /></label>
+                <p id="settingsMessage" class="text-xs text-[#657268]"></p>
+            </div>
+            <div class="mt-6 flex justify-end gap-2"><button onclick="closeSettings()" class="rounded-lg px-4 py-2 text-sm text-[#536158]">取消</button><button onclick="saveSettings()" class="rounded-lg bg-[#146c5f] px-4 py-2 text-sm font-semibold text-white">保存</button></div>
+        </div>
+    </div>
+
+    <!-- Delete confirmation dialog -->
+    <div id="deleteDialog" class="dialog-backdrop">
+        <div class="dialog-content">
+            <div class="flex items-start gap-3 mb-4">
+                <div class="bg-red-100 rounded-full p-2">
+                    <i data-lucide="trash-2" class="w-5 h-5 text-red-600"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-[#111814]">确认删除</h3>
+                    <p class="text-sm text-[#536158] mt-1">此操作将删除该会话记录以及生成的项目文件，无法恢复。</p>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button id="cancelDeleteBtn" onclick="closeDeleteDialog()" class="px-4 py-2 rounded-lg text-sm font-medium text-[#536158] hover:bg-[#edf1e8] transition-colors">取消</button>
+                <button id="confirmDeleteBtn" onclick="executeDelete()" class="px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition-colors">确认删除</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'yolo';
+        let _deleteSessionId = null;
+
+        /* ── Generate ───────────────────────────── */
+        async function generate() {
+            const input = document.getElementById('userInput').value.trim();
+            if (!input) { alert('请描述要管理的信息和业务流程'); return; }
+            const btn = document.getElementById('sendBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i>';
+            safeCreateIcons();
+            try {
+                const resp = await fetch('/api/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_input: input, mode: currentMode }) });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                if (data.session_id) window.location.href = '/session/' + data.session_id;
+            } catch (e) { alert('生成失败: ' + e.message); btn.disabled = false; btn.innerHTML = '<i data-lucide="arrow-up" class="h-4 w-4"></i>'; safeCreateIcons(); updateSendButton(); }
+        }
+
+        /* ── Session List ───────────────────────── */
+        const STATUS_CFG = {
+            completed: { dot: 'bg-green-400', label: '已完成' },
+            failed:    { dot: 'bg-red-400',   label: '失败' },
+            running:   { dot: 'bg-[#146c5f]', label: '进行中' },
+            pending:   { dot: 'bg-[#d8dfd5]',   label: '等待中' },
+        };
+
+        async function loadSessions() {
+            try {
+                const resp = await fetch('/api/sessions?limit=50');
+                const data = await resp.json();
+                renderSessions(data.sessions || []);
+            } catch (e) { console.error(e); }
+        }
+
+        function renderSessions(sessions) {
+            const container = document.getElementById('sessionList');
+            if (!sessions.length) { container.innerHTML = '<p class="text-center text-[#657268] text-sm py-8">暂无历史记录</p>'; return; }
+            container.innerHTML = sessions.map(s => {
+                const cfg = STATUS_CFG[s.status] || STATUS_CFG.pending;
+                const time = s.created_at ? s.created_at.slice(5, 16).replace('T', ' ') : '';
+                const name = s.project_name || s.user_input.slice(0, 20) + '...';
+                return `
+                    <a href="/session/${s.id}"
+                       class="session-item flex items-center gap-2 px-3 py-2.5 rounded-lg group relative">
+                        <div class="mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}"></div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-medium text-[#111814] truncate">${escHtml(name)}</div>
+                            <div class="text-xs text-[#657268] mt-0.5">${time}</div>
+                        </div>
+                        <button onclick="event.preventDefault(); showDeleteDialog('${s.id}', '${escHtml(name)}')"
+                            class="delete-btn flex-shrink-0 p-1.5 rounded-md text-[#657268] hover:text-red-600 transition-colors"
+                            title="删除">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </a>`;
+            }).join('');
+            safeCreateIcons();
+        }
+
+        async function openSettings() {
+            document.getElementById('settingsDialog').classList.add('show');
+            const message = document.getElementById('settingsMessage');
+            try {
+                const data = await (await fetch('/api/settings')).json();
+                document.getElementById('settingsBaseUrl').value = data.base_url || '';
+                document.getElementById('settingsModel').value = data.model || '';
+                document.getElementById('settingsDataDir').value = data.data_dir || '';
+                message.textContent = data.api_key_set ? 'API Key 已配置' : 'API Key 尚未配置';
+            } catch (e) { message.textContent = '读取设置失败'; }
+        }
+        function closeSettings() { document.getElementById('settingsDialog').classList.remove('show'); }
+        async function saveSettings() {
+            const message = document.getElementById('settingsMessage');
+            const response = await fetch('/api/settings', { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
+                base_url: document.getElementById('settingsBaseUrl').value,
+                model: document.getElementById('settingsModel').value,
+                api_key: document.getElementById('settingsApiKey').value,
+                data_dir: document.getElementById('settingsDataDir').value,
+            }) });
+            const result = await response.json();
+            message.textContent = result.restart_required ? '已保存，数据目录将在重启后生效' : '已保存';
+            document.getElementById('settingsApiKey').value = '';
+        }
+
+        /* ── Delete Dialog ───────────────────────── */
+        function showDeleteDialog(id, name) {
+            _deleteSessionId = id;
+            document.getElementById('deleteDialog').classList.add('show');
+        }
+
+        function closeDeleteDialog() {
+            _deleteSessionId = null;
+            document.getElementById('deleteDialog').classList.remove('show');
+        }
+
+        async function executeDelete() {
+            if (!_deleteSessionId) return;
+            const btn = document.getElementById('confirmDeleteBtn');
+            btn.textContent = '删除中...';
+            btn.disabled = true;
+            try {
+                const resp = await fetch(`/api/sessions/${_deleteSessionId}`, { method: 'DELETE' });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                closeDeleteDialog();
+                loadSessions();
+            } catch (e) { alert('删除失败: ' + e.message); }
+            finally { btn.textContent = '确认删除'; btn.disabled = false; }
+        }
+
+        function escHtml(s) { const d=document.createElement('div'); d.textContent=s || ''; return d.innerHTML; }
+
+        function updateSendButton() {
+            const input = document.getElementById('userInput');
+            const btn = document.getElementById('sendBtn');
+            if (!input || !btn) return;
+            const enabled = Boolean(input.value.trim());
+            btn.disabled = !enabled;
+            btn.classList.toggle('bg-[#146c5f]', enabled);
+            btn.classList.toggle('hover:bg-[#0e574d]', enabled);
+            btn.classList.toggle('bg-[#d8dfd5]', !enabled);
+        }
+
+        const userInput = document.getElementById('userInput');
+        userInput.addEventListener('input', updateSendButton);
+        userInput.addEventListener('keydown', event => {
+            if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                event.preventDefault();
+                if (!document.getElementById('sendBtn').disabled) generate();
+            }
+        });
+        updateSendButton();
+        loadSessions();
+        updateSidebarUI();
+        safeCreateIcons();
+    </script>
+</body>
+</html>

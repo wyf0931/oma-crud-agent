@@ -1,0 +1,18 @@
+[project]
+name = "{{ project.code }}"
+version = "{{ project.version }}"
+description = "{{ project.name }}"
+requires-python = ">=3.8"
+dependencies = [
+    "flask>=3.0.0",
+    "flask-admin>=1.6.0",
+    "flask-sqlalchemy>=3.1.0",
+    "flask-bcrypt>=1.0.0",
+    "flask-login>=0.6.0",
+    "flask-babel>=4.0.0",
+    "wtforms>=3.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
