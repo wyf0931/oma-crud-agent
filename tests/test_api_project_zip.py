@@ -11,7 +11,8 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture
 def client():
-    from backend.main import create_app
+    from oma_info_system.api.app import create_app
+
     app = create_app()
     return TestClient(app)
 
@@ -34,21 +35,21 @@ def _fake_session(project_path: str = "/tmp/fake-project") -> dict:
     }
 
 
-@patch("backend.api.sessions.session_manager")
+@patch("oma_info_system.api.routes.sessions.session_manager")
 def test_project_zip_returns_404_for_missing_session(mock_sm, client):
     mock_sm.get.return_value = None
     response = client.get("/api/sessions/nope/project/zip")
     assert response.status_code == 404
 
 
-@patch("backend.api.sessions.session_manager")
+@patch("oma_info_system.api.routes.sessions.session_manager")
 def test_project_zip_400_when_session_not_completed(mock_sm, client):
     mock_sm.get.return_value = {"status": "running", "project_path": "/tmp/x"}
     response = client.get("/api/sessions/sess-1/project/zip")
     assert response.status_code == 400
 
 
-@patch("backend.api.sessions.session_manager")
+@patch("oma_info_system.api.routes.sessions.session_manager")
 def test_project_zip_400_when_project_path_missing(mock_sm, client, tmp_path):
     fake = _fake_session(str(tmp_path / "does-not-exist"))
     mock_sm.get.return_value = fake
@@ -56,7 +57,7 @@ def test_project_zip_400_when_project_path_missing(mock_sm, client, tmp_path):
     assert response.status_code == 400
 
 
-@patch("backend.api.sessions.session_manager")
+@patch("oma_info_system.api.routes.sessions.session_manager")
 def test_project_zip_streams_valid_zip_with_project_files(mock_sm, client, tmp_path):
     project_dir = tmp_path / "myproject"
     project_dir.mkdir()
@@ -85,7 +86,7 @@ def test_project_zip_streams_valid_zip_with_project_files(mock_sm, client, tmp_p
     assert "myproject/subdir/model.py" in names
 
 
-@patch("backend.api.sessions.session_manager")
+@patch("oma_info_system.api.routes.sessions.session_manager")
 def test_project_zip_excludes_build_and_cache_junk(mock_sm, client, tmp_path):
     project_dir = tmp_path / "myproject"
     project_dir.mkdir()
@@ -114,7 +115,7 @@ def test_project_zip_excludes_build_and_cache_junk(mock_sm, client, tmp_path):
     assert not any(n.endswith(".DS_Store") for n in names), names
 
 
-@patch("backend.api.sessions.session_manager")
+@patch("oma_info_system.api.routes.sessions.session_manager")
 def test_project_zip_sanitizes_unsafe_project_name(mock_sm, client, tmp_path):
     project_dir = tmp_path / "proj"
     project_dir.mkdir()

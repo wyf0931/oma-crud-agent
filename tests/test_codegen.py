@@ -1,23 +1,31 @@
 """Tests for the Jinja2 template-based code generation pipeline."""
 
 import ast
-import re
 import tempfile
 from pathlib import Path
+from typing import cast
 
-import pytest
-from codegen.generator import CodeGenerator
 from conftest import parse_python
-
+from oma_info_system.workflow.state import AgentState
 
 # ---------------------------------------------------------------------------
 # File existence
 # ---------------------------------------------------------------------------
 
 EXPECTED_FILES = [
-    "app.py", "models.py", "views.py", "config.py", "extensions.py",
-    "run.py", "run.sh", "pyproject.toml", ".gitignore", ".env.example",
-    "README.md", "project.json", "instance",
+    "app.py",
+    "models.py",
+    "views.py",
+    "config.py",
+    "extensions.py",
+    "run.py",
+    "run.sh",
+    "pyproject.toml",
+    ".gitignore",
+    ".env.example",
+    "README.md",
+    "project.json",
+    "instance",
 ]
 
 
@@ -33,6 +41,7 @@ def test_run_sh_is_executable(generated_project):
 
 def test_project_json_matches_config(generator, sample_config):
     import json
+
     with tempfile.TemporaryDirectory() as tmpdir:
         path = Path(generator.generate(sample_config, tmpdir))
         saved = json.loads((path / "project.json").read_text())
@@ -44,6 +53,7 @@ def test_project_json_matches_config(generator, sample_config):
 # ---------------------------------------------------------------------------
 # app.py
 # ---------------------------------------------------------------------------
+
 
 def test_app_py_has_create_app(generated_project):
     tree = parse_python(generated_project / "app.py")
@@ -85,6 +95,7 @@ def test_app_py_has_admin_url_in_run_sh(generated_project):
 # ---------------------------------------------------------------------------
 # models.py
 # ---------------------------------------------------------------------------
+
 
 def test_models_py_has_user_class(generated_project):
     tree = parse_python(generated_project / "models.py")
@@ -132,21 +143,21 @@ def test_models_py_required_field_has_nullable_false(generated_project):
     src = (generated_project / "models.py").read_text()
     # "title" is required=True → should have nullable=False
     # Find the title field definition
-    title_block = src[src.find("title"):src.find("title") + 200]
+    title_block = src[src.find("title") : src.find("title") + 200]
     assert "nullable=False" in title_block, "Required field 'title' should have nullable=False"
 
 
 def test_models_py_searchable_field_has_index(generated_project):
     src = (generated_project / "models.py").read_text()
     # "title" has can_search=True → should have index=True
-    title_block = src[src.find("title"):src.find("title") + 200]
+    title_block = src[src.find("title") : src.find("title") + 200]
     assert "index=True" in title_block, "Searchable field 'title' should have index=True"
 
 
 def test_models_py_non_searchable_has_no_index(generated_project):
     src = (generated_project / "models.py").read_text()
     # "price" has can_search=False → should NOT have index=True
-    price_block = src[src.find("price"):src.find("price") + 100]
+    price_block = src[src.find("price") : src.find("price") + 100]
     assert "index=True" not in price_block, "Non-searchable field 'price' should not have index=True"
 
 
@@ -158,6 +169,7 @@ def test_models_py_id_is_primary_key(generated_project):
 # ---------------------------------------------------------------------------
 # config.py
 # ---------------------------------------------------------------------------
+
 
 def test_config_py_has_secret_key(generated_project, sample_config):
     src = (generated_project / "config.py").read_text()
@@ -180,6 +192,7 @@ def test_config_py_has_sqlalchemy_database_uri(generated_project):
 # ---------------------------------------------------------------------------
 # run.py
 # ---------------------------------------------------------------------------
+
 
 def test_run_py_exists(generated_project):
     assert (generated_project / "run.py").exists()
@@ -209,6 +222,7 @@ def test_run_py_calls_db_create_all(generated_project):
 # Multiple modules
 # ---------------------------------------------------------------------------
 
+
 def test_multi_module_all_modules_in_app_py(generated_multi_project, multi_module_config):
     src = (generated_multi_project / "app.py").read_text()
     for m in multi_module_config["modules"]:
@@ -234,6 +248,7 @@ def test_multi_module_each_has_tablename(generated_multi_project):
 # Empty modules (edge case)
 # ---------------------------------------------------------------------------
 
+
 def test_empty_modules_still_generates_valid_files(generated_empty_project):
     for fname in EXPECTED_FILES:
         assert (generated_empty_project / fname).exists(), f"Missing: {fname}"
@@ -256,53 +271,46 @@ def test_empty_modules_models_py_has_only_user(generated_empty_project):
 # Integration: through agent node
 # ---------------------------------------------------------------------------
 
-def test_agent_codegen_node_uses_code_generator():
-    """Verify agent/nodes/codegen.py delegates to CodeGenerator."""
-    from agent.nodes.codegen import generate_project
-
-    src = Path(__file__).parent.parent / "agent" / "nodes" / "codegen.py"
-    content = src.read_text()
-    assert "from codegen.generator import CodeGenerator" in content
-    assert "generator.generate(" in content
-    assert "CodeGenerator()" in content
-
 
 def test_agent_codegen_node_with_minimal_state(tmp_path):
-    """End-to-end: agent codegen node with minimal state."""
-    from agent.nodes.codegen import generate_project
+    """End-to-end: agent oma_info_system.generation node with minimal state."""
+    from oma_info_system.workflow.nodes.codegen import generate_project
 
     output_dir = str(tmp_path / "projects")
-    state = {
-        "user_input": "test",
-        "mode": "yolo",
-        "output_dir": output_dir,
-        "project_name": "TestApp",
-        "modules": [
-            {"name": "Product", "label": "产品管理", "description": "Product CRUD"},
-        ],
-        "fields": {
-            "Product": [
-                {"name": "name", "type": "String", "required": True, "can_search": True},
-                {"name": "price", "type": "Float", "required": False, "can_search": False},
+    state = cast(
+        AgentState,
+        {
+            "user_input": "test",
+            "mode": "yolo",
+            "output_dir": output_dir,
+            "project_name": "TestApp",
+            "modules": [
+                {"name": "Product", "label": "产品管理", "description": "Product CRUD"},
             ],
+            "fields": {
+                "Product": [
+                    {"name": "name", "type": "String", "required": True, "can_search": True},
+                    {"name": "price", "type": "Float", "required": False, "can_search": False},
+                ],
+            },
+            "project_config": None,
+            "project_path": None,
+            "current_step": "",
+            "step_history": [],
+            "step_details": {},
+            "review_issues": [],
+            "review_fixes": [],
+            "test_errors": None,
+            "retry_count": 0,
+            "max_retries": 3,
+            "approval_required": False,
+            "pending_approval": None,
+            "approval_response": None,
+            "result": None,
+            "error": None,
+            "status": "running",
         },
-        "project_config": None,
-        "project_path": None,
-        "current_step": "",
-        "step_history": [],
-        "step_details": {},
-        "review_issues": [],
-        "review_fixes": [],
-        "test_errors": None,
-        "retry_count": 0,
-        "max_retries": 3,
-        "approval_required": False,
-        "pending_approval": None,
-        "approval_response": None,
-        "result": None,
-        "error": None,
-        "status": "running",
-    }
+    )
 
     result = generate_project(state)
 

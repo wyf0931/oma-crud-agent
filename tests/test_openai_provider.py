@@ -3,7 +3,7 @@ from unittest.mock import Mock
 import httpx
 from openai import RateLimitError
 
-from agent.providers.openai_compatible import OpenAICompatibleProvider
+from oma_info_system.providers.openai_compatible import OpenAICompatibleProvider
 
 
 def _rate_limit_error(retry_after: str = "0") -> RateLimitError:
@@ -22,7 +22,7 @@ def test_provider_retries_rate_limit_with_retry_after(monkeypatch):
     client = Mock()
     client.chat.completions.create = create
     sleeps = []
-    monkeypatch.setattr("agent.providers.openai_compatible.time.sleep", sleeps.append)
+    monkeypatch.setattr("oma_info_system.providers.openai_compatible.time.sleep", sleeps.append)
 
     result = provider._create_completion(client, model="test-model")
 

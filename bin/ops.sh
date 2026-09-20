@@ -134,12 +134,12 @@ start_server() {
     # Fall back to uv when the virtual environment has not been created yet.
     cd "$PROJECT_ROOT"
     if [ -x "$PYTHON_BIN" ]; then
-        nohup "$PYTHON_BIN" -m uvicorn backend.main:app \
+        nohup "$PYTHON_BIN" -m uvicorn oma_info_system.api.app:app \
             --host 127.0.0.1 \
             --port "$PORT" \
             >> "$LOG_FILE" 2>&1 &
     else
-        nohup "$UV_CMD" run python -m uvicorn backend.main:app \
+        nohup "$UV_CMD" run python -m uvicorn oma_info_system.api.app:app \
             --host 127.0.0.1 \
             --port "$PORT" \
             >> "$LOG_FILE" 2>&1 &

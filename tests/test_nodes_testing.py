@@ -1,15 +1,20 @@
 from pathlib import Path
+from typing import cast
 
-from agent.nodes.testing import test_launch as run_test_launch
+from oma_info_system.workflow.nodes.testing import test_launch as run_test_launch
+from oma_info_system.workflow.state import AgentState
 
 
-def _state(project_path: str) -> dict:
-    return {
-        "project_path": project_path,
-        "step_history": [],
-        "step_details": {},
-        "test_errors": None,
-    }
+def _state(project_path: str) -> AgentState:
+    return cast(
+        AgentState,
+        {
+            "project_path": project_path,
+            "step_history": [],
+            "step_details": {},
+            "test_errors": None,
+        },
+    )
 
 
 def test_test_launch_passes_valid_generated_project(tmp_path):

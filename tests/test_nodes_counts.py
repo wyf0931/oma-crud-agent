@@ -1,9 +1,9 @@
 """Tests for module/field count constraint handling in requirements + generation nodes."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from agent.state.types import AgentState
-from agent.nodes.generation import _normalize_field
+from oma_info_system.workflow.nodes.generation import _normalize_field
+from oma_info_system.workflow.state import AgentState
 
 
 def test_normalize_field_accepts_camel_case_search_flag():
@@ -27,14 +27,19 @@ def _base_state(user_input: str = "生成图书管理系统") -> AgentState:
 
 # ----- understand_requirements -----
 
-@patch("agent.nodes.requirements.get_provider")
+
+@patch("oma_info_system.workflow.nodes.requirements.get_provider")
 def test_understand_requirements_extracts_explicit_module_max(mock_get_provider):
-    from agent.nodes.requirements import understand_requirements
+    from oma_info_system.workflow.nodes.requirements import understand_requirements
 
     mock_provider = MagicMock()
     mock_provider.call_detailed.return_value = {
         "content": '{"project_name":"图书管理系统","business_domain":"图书馆","features":[],"module_count_max":4,"field_count_max":12}',
-        "thinking": None, "prompt": "", "model": "x", "usage": None, "duration_ms": 0,
+        "thinking": None,
+        "prompt": "",
+        "model": "x",
+        "usage": None,
+        "duration_ms": 0,
     }
     mock_get_provider.return_value = mock_provider
 
@@ -45,14 +50,18 @@ def test_understand_requirements_extracts_explicit_module_max(mock_get_provider)
     assert result["field_count_max"] == 12
 
 
-@patch("agent.nodes.requirements.get_provider")
+@patch("oma_info_system.workflow.nodes.requirements.get_provider")
 def test_understand_requirements_defaults_to_none_when_unspecified(mock_get_provider):
-    from agent.nodes.requirements import understand_requirements
+    from oma_info_system.workflow.nodes.requirements import understand_requirements
 
     mock_provider = MagicMock()
     mock_provider.call_detailed.return_value = {
         "content": '{"project_name":"图书管理系统","business_domain":"图书馆","features":[]}',
-        "thinking": None, "prompt": "", "model": "x", "usage": None, "duration_ms": 0,
+        "thinking": None,
+        "prompt": "",
+        "model": "x",
+        "usage": None,
+        "duration_ms": 0,
     }
     mock_get_provider.return_value = mock_provider
 
@@ -62,15 +71,19 @@ def test_understand_requirements_defaults_to_none_when_unspecified(mock_get_prov
     assert result["field_count_max"] is None
 
 
-@patch("agent.nodes.requirements.get_provider")
+@patch("oma_info_system.workflow.nodes.requirements.get_provider")
 def test_understand_requirements_coerces_string_counts(mock_get_provider):
     """LLM may return counts as strings — coerce to int."""
-    from agent.nodes.requirements import understand_requirements
+    from oma_info_system.workflow.nodes.requirements import understand_requirements
 
     mock_provider = MagicMock()
     mock_provider.call_detailed.return_value = {
         "content": '{"project_name":"X","business_domain":"X","features":[],"module_count_max":"5","field_count_max":"10"}',
-        "thinking": None, "prompt": "", "model": "x", "usage": None, "duration_ms": 0,
+        "thinking": None,
+        "prompt": "",
+        "model": "x",
+        "usage": None,
+        "duration_ms": 0,
     }
     mock_get_provider.return_value = mock_provider
 
@@ -80,15 +93,19 @@ def test_understand_requirements_coerces_string_counts(mock_get_provider):
     assert result["field_count_max"] == 10
 
 
-@patch("agent.nodes.requirements.get_provider")
+@patch("oma_info_system.workflow.nodes.requirements.get_provider")
 def test_understand_requirements_rejects_non_positive_counts(mock_get_provider):
     """Zero or negative counts make no sense — fall back to None."""
-    from agent.nodes.requirements import understand_requirements
+    from oma_info_system.workflow.nodes.requirements import understand_requirements
 
     mock_provider = MagicMock()
     mock_provider.call_detailed.return_value = {
         "content": '{"project_name":"X","business_domain":"X","features":[],"module_count_max":0,"field_count_max":-3}',
-        "thinking": None, "prompt": "", "model": "x", "usage": None, "duration_ms": 0,
+        "thinking": None,
+        "prompt": "",
+        "model": "x",
+        "usage": None,
+        "duration_ms": 0,
     }
     mock_get_provider.return_value = mock_provider
 
@@ -98,10 +115,10 @@ def test_understand_requirements_rejects_non_positive_counts(mock_get_provider):
     assert result["field_count_max"] is None
 
 
-@patch("agent.nodes.requirements.get_provider")
+@patch("oma_info_system.workflow.nodes.requirements.get_provider")
 def test_understand_requirements_resets_counts_on_llm_failure(mock_get_provider):
     """If LLM throws, counts must not leak stale state."""
-    from agent.nodes.requirements import understand_requirements
+    from oma_info_system.workflow.nodes.requirements import understand_requirements
 
     mock_provider = MagicMock()
     mock_provider.call_detailed.side_effect = RuntimeError("api down")
@@ -116,14 +133,19 @@ def test_understand_requirements_resets_counts_on_llm_failure(mock_get_provider)
 
 # ----- generate_modules -----
 
-@patch("agent.nodes.generation.get_provider")
+
+@patch("oma_info_system.workflow.nodes.generation.get_provider")
 def test_generate_modules_uses_explicit_module_max_in_prompt(mock_get_provider):
-    from agent.nodes.generation import generate_modules
+    from oma_info_system.workflow.nodes.generation import generate_modules
 
     mock_provider = MagicMock()
     mock_provider.call_detailed.return_value = {
         "content": '[{"name":"A","label":"甲","description":"x"}]',
-        "thinking": None, "prompt": "", "model": "x", "usage": None, "duration_ms": 0,
+        "thinking": None,
+        "prompt": "",
+        "model": "x",
+        "usage": None,
+        "duration_ms": 0,
     }
     mock_get_provider.return_value = mock_provider
 
@@ -141,14 +163,18 @@ def test_generate_modules_uses_explicit_module_max_in_prompt(mock_get_provider):
     assert "不超过 4 个模块" in sent_prompt
 
 
-@patch("agent.nodes.generation.get_provider")
+@patch("oma_info_system.workflow.nodes.generation.get_provider")
 def test_generate_modules_falls_back_to_default_when_unspecified(mock_get_provider):
-    from agent.nodes.generation import generate_modules
+    from oma_info_system.workflow.nodes.generation import generate_modules
 
     mock_provider = MagicMock()
     mock_provider.call_detailed.return_value = {
         "content": '[{"name":"A","label":"甲","description":"x"}]',
-        "thinking": None, "prompt": "", "model": "x", "usage": None, "duration_ms": 0,
+        "thinking": None,
+        "prompt": "",
+        "model": "x",
+        "usage": None,
+        "duration_ms": 0,
     }
     mock_get_provider.return_value = mock_provider
 
@@ -165,14 +191,19 @@ def test_generate_modules_falls_back_to_default_when_unspecified(mock_get_provid
 
 # ----- generate_fields -----
 
-@patch("agent.nodes.generation.get_provider")
+
+@patch("oma_info_system.workflow.nodes.generation.get_provider")
 def test_generate_fields_uses_explicit_field_max_in_prompt(mock_get_provider):
-    from agent.nodes.generation import generate_fields
+    from oma_info_system.workflow.nodes.generation import generate_fields
 
     mock_provider = MagicMock()
     mock_provider.call_detailed.return_value = {
         "content": '{"fields":[{"name":"a","label":"甲","type":"String","canSearch":true,"required":true,"description":"x"}]}',
-        "thinking": None, "prompt": "", "model": "x", "usage": None, "duration_ms": 0,
+        "thinking": None,
+        "prompt": "",
+        "model": "x",
+        "usage": None,
+        "duration_ms": 0,
     }
     mock_get_provider.return_value = mock_provider
 
@@ -187,14 +218,18 @@ def test_generate_fields_uses_explicit_field_max_in_prompt(mock_get_provider):
     assert "每个模块不超过 12 个字段" in sent_prompt
 
 
-@patch("agent.nodes.generation.get_provider")
+@patch("oma_info_system.workflow.nodes.generation.get_provider")
 def test_generate_fields_falls_back_to_default_when_unspecified(mock_get_provider):
-    from agent.nodes.generation import generate_fields
+    from oma_info_system.workflow.nodes.generation import generate_fields
 
     mock_provider = MagicMock()
     mock_provider.call_detailed.return_value = {
         "content": '{"fields":[{"name":"a","label":"甲","type":"String","canSearch":true,"required":true,"description":"x"}]}',
-        "thinking": None, "prompt": "", "model": "x", "usage": None, "duration_ms": 0,
+        "thinking": None,
+        "prompt": "",
+        "model": "x",
+        "usage": None,
+        "duration_ms": 0,
     }
     mock_get_provider.return_value = mock_provider
 

@@ -1,18 +1,20 @@
-"""Shared test fixtures for codegen tests."""
+"""Shared test fixtures for code generation tests."""
 
 import ast
+import random
 import secrets
 import string
-import random
-import pytest
 import tempfile
 from pathlib import Path
-from codegen.generator import CodeGenerator
+
+import pytest
+
+from oma_info_system.generation.generator import CodeGenerator
 
 
 def _make_code() -> str:
     code_chars = string.ascii_lowercase + string.digits
-    return ''.join(random.choices(code_chars[:5], k=5))
+    return "".join(random.choices(code_chars[:5], k=5))
 
 
 @pytest.fixture

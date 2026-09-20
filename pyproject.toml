@@ -22,10 +22,43 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["backend", "agent", "codegen", "shared"]
+packages = ["src/oma_info_system"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+    "/bin",
+    "/README.md",
+    "/AGENTS.md",
+    "/LICENSE",
+    "/pyproject.toml",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+src = ["src", "tests"]
+# generation/templates/ holds Jinja2 templates that render to Python, not Python.
+extend-exclude = ["src/oma_info_system/generation/templates"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["oma_info_system"]
+
+[tool.pyright]
+include = ["src", "tests"]
+extraPaths = ["src"]
+pythonVersion = "3.10"
+venvPath = "."
+venv = ".venv"
 
 [project.optional-dependencies]
 web = [
@@ -37,7 +70,6 @@ web = [
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
-    "black>=23.0.0",
     "ruff>=0.1.0",
 ]
 
@@ -46,5 +78,5 @@ complete = [
 ]
 
 [project.scripts]
-info-system-agent = "backend.main:main"
-oma = "backend.main:main"
+info-system-agent = "oma_info_system.__main__:main"
+oma = "oma_info_system.__main__:main"

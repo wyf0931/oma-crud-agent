@@ -5,7 +5,8 @@ import pytest
 
 def _reload_resolver():
     """Return the resolver; it reads environment and filesystem state per call."""
-    from backend.api.sessions import _resolve_uv_bin
+    from oma_info_system.api.routes.sessions import _resolve_uv_bin
+
     return _resolve_uv_bin
 
 
@@ -43,7 +44,7 @@ def test_resolve_uv_bin_500s_when_missing(monkeypatch, tmp_path):
     fake_home = tmp_path / "empty_home"
     fake_home.mkdir()
     monkeypatch.setenv("HOME", str(fake_home))
-    monkeypatch.setattr("backend.api.sessions.Path.exists", lambda self: False)
+    monkeypatch.setattr("oma_info_system.api.routes.sessions.Path.exists", lambda self: False)
 
     resolver = _reload_resolver()
     with pytest.raises(HTTPException) as exc:

@@ -50,7 +50,7 @@ bin/ops.sh            Local process helper
 uv sync --all-extras
 cp .env.example .env
 # edit .env and set OPENAI_API_KEY
-uv run uvicorn backend.main:app --host 127.0.0.1 --port 8020
+uv run uvicorn oma_info_system.api.app:app --host 127.0.0.1 --port 8020
 ```
 
 Open `http://127.0.0.1:8020`.
@@ -87,7 +87,7 @@ When `DATA_DIR` is omitted, the application uses the repository's `data/` direct
 Recommended production command:
 
 ```bash
-uv run uvicorn backend.main:app --host 127.0.0.1 --port 8020
+uv run uvicorn oma_info_system.api.app:app --host 127.0.0.1 --port 8020
 ```
 
 ## License

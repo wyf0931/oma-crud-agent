@@ -1,4 +1,4 @@
-from shared.storage.database import get_database
+from oma_info_system.platform.storage import get_database
 
 
 def test_database_ignores_legacy_files(tmp_path):

@@ -1,6 +1,6 @@
 import pytest
 
-from agent.json_utils import parse_json_response
+from oma_info_system.json_utils import parse_json_response
 
 
 def test_parse_json_response_tolerates_markdown_fence_and_prefix():

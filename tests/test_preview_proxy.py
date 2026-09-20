@@ -1,6 +1,6 @@
 """Tests for the preview reverse-proxy endpoint."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,19 +8,20 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture
 def client(monkeypatch):
-    from backend.main import create_app
+    from oma_info_system.api.app import create_app
+
     app = create_app()
     return TestClient(app)
 
 
-@patch("backend.api.sessions.preview_manager")
+@patch("oma_info_system.api.routes.sessions.preview_manager")
 def test_proxy_returns_404_when_no_preview_running(mock_pm, client):
     mock_pm.get_record.return_value = None
     response = client.get("/api/sessions/sess-1/preview/proxy/admin/")
     assert response.status_code == 404
 
 
-@patch("backend.api.sessions.preview_manager")
+@patch("oma_info_system.api.routes.sessions.preview_manager")
 def test_proxy_returns_404_when_preview_destroyed(mock_pm, client):
     rec = MagicMock()
     rec.state = "destroyed"
@@ -30,10 +31,11 @@ def test_proxy_returns_404_when_preview_destroyed(mock_pm, client):
     assert response.status_code == 404
 
 
-@patch("backend.api.sessions.preview_manager")
+@patch("oma_info_system.api.routes.sessions.preview_manager")
 def test_proxy_returns_502_when_upstream_unreachable(mock_pm, client):
     """If the Flask process died or hasn't bound yet, return 502."""
     import httpx
+
     rec = MagicMock()
     rec.state = "preview"
     rec.port = 5001
@@ -41,9 +43,15 @@ def test_proxy_returns_502_when_upstream_unreachable(mock_pm, client):
 
     # Patch AsyncClient.request to raise ConnectError
     class _FakeAsyncClient:
-        def __init__(self, *a, **kw): pass
-        async def __aenter__(self): return self
-        async def __aexit__(self, *a): return False
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
         async def request(self, *a, **kw):
             raise httpx.ConnectError("connection refused")
 
@@ -52,7 +60,7 @@ def test_proxy_returns_502_when_upstream_unreachable(mock_pm, client):
     assert response.status_code == 502
 
 
-@patch("backend.api.sessions.preview_manager")
+@patch("oma_info_system.api.routes.sessions.preview_manager")
 def test_proxy_forwards_path_query_and_method_to_upstream(mock_pm, client):
     """Path, query string, method, and request body must reach the upstream."""
     captured = {}
@@ -63,9 +71,15 @@ def test_proxy_forwards_path_query_and_method_to_upstream(mock_pm, client):
         content = b"<html>admin</html>"
 
     class _FakeAsyncClient:
-        def __init__(self, *a, **kw): pass
-        async def __aenter__(self): return self
-        async def __aexit__(self, *a): return False
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
         async def request(self, method, url, **kw):
             captured["method"] = method
             captured["url"] = url
@@ -94,11 +108,11 @@ def test_proxy_forwards_path_query_and_method_to_upstream(mock_pm, client):
     assert captured["content"] == b'{"foo": "bar"}'
 
 
-@patch("backend.api.sessions.preview_manager")
-@patch("backend.api.sessions._resolve_uv_bin", return_value="/usr/local/bin/uv")
-@patch("backend.api.sessions._find_free_port", return_value=5012)
-@patch("backend.api.sessions._wait_for_preview")
-@patch("backend.api.sessions.subprocess")
+@patch("oma_info_system.api.routes.sessions.preview_manager")
+@patch("oma_info_system.api.routes.sessions._resolve_uv_bin", return_value="/usr/local/bin/uv")
+@patch("oma_info_system.api.routes.sessions._find_free_port", return_value=5012)
+@patch("oma_info_system.api.routes.sessions._wait_for_preview")
+@patch("oma_info_system.api.routes.sessions.subprocess")
 def test_start_preview_includes_public_url_when_base_set(
     mock_subprocess, mock_wait, mock_port, mock_uv, mock_pm, client, tmp_path, monkeypatch
 ):
@@ -119,7 +133,7 @@ def test_start_preview_includes_public_url_when_base_set(
         "status": "completed",
         "project_path": str(project_dir),
     }
-    with patch("backend.api.sessions.session_manager") as mock_sm:
+    with patch("oma_info_system.api.routes.sessions.session_manager") as mock_sm:
         mock_sm.get.return_value = session
         response = client.post("/api/sessions/abc123/preview")
 
@@ -130,11 +144,11 @@ def test_start_preview_includes_public_url_when_base_set(
     assert data["preview_url"] == "http://127.0.0.1:5012/admin/"
 
 
-@patch("backend.api.sessions.preview_manager")
-@patch("backend.api.sessions._resolve_uv_bin", return_value="/usr/local/bin/uv")
-@patch("backend.api.sessions._find_free_port", return_value=5012)
-@patch("backend.api.sessions._wait_for_preview")
-@patch("backend.api.sessions.subprocess")
+@patch("oma_info_system.api.routes.sessions.preview_manager")
+@patch("oma_info_system.api.routes.sessions._resolve_uv_bin", return_value="/usr/local/bin/uv")
+@patch("oma_info_system.api.routes.sessions._find_free_port", return_value=5012)
+@patch("oma_info_system.api.routes.sessions._wait_for_preview")
+@patch("oma_info_system.api.routes.sessions.subprocess")
 def test_start_preview_falls_back_to_subpath_proxy_when_base_unset(
     mock_subprocess, mock_wait, mock_port, mock_uv, mock_pm, client, tmp_path, monkeypatch
 ):
@@ -154,7 +168,7 @@ def test_start_preview_falls_back_to_subpath_proxy_when_base_unset(
         "status": "completed",
         "project_path": str(project_dir),
     }
-    with patch("backend.api.sessions.session_manager") as mock_sm:
+    with patch("oma_info_system.api.routes.sessions.session_manager") as mock_sm:
         mock_sm.get.return_value = session
         response = client.post("/api/sessions/abc123/preview")
 
@@ -163,16 +177,16 @@ def test_start_preview_falls_back_to_subpath_proxy_when_base_unset(
     assert data["public_url"] == "/api/sessions/abc123/preview/proxy/admin/"
 
 
-@patch("backend.api.sessions.preview_manager")
+@patch("oma_info_system.api.routes.sessions.preview_manager")
 def test_proxy_rewrites_html_absolute_urls_in_subpath_mode(mock_pm, client, monkeypatch):
     """In subpath mode, absolute /admin/ URLs must be prefixed so the browser routes them through the proxy."""
     monkeypatch.delenv("PREVIEW_PUBLIC_BASE", raising=False)
 
     html = (
-        '<html><head>'
+        "<html><head>"
         '<link href="/admin/static/foo.css" rel="stylesheet">'
         '<script src="/admin/static/bar.js"></script>'
-        '</head><body>content</body></html>'
+        "</head><body>content</body></html>"
     )
 
     class _FakeResponse:
@@ -181,10 +195,17 @@ def test_proxy_rewrites_html_absolute_urls_in_subpath_mode(mock_pm, client, monk
         content = html.encode("utf-8")
 
     class _FakeAsyncClient:
-        def __init__(self, *a, **kw): pass
-        async def __aenter__(self): return self
-        async def __aexit__(self, *a): return False
-        async def request(self, *a, **kw): return _FakeResponse()
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def request(self, *a, **kw):
+            return _FakeResponse()
 
     rec = MagicMock()
     rec.state = "preview"
@@ -202,7 +223,7 @@ def test_proxy_rewrites_html_absolute_urls_in_subpath_mode(mock_pm, client, monk
     assert 'href="/admin/static/foo.css"' not in body
 
 
-@patch("backend.api.sessions.preview_manager")
+@patch("oma_info_system.api.routes.sessions.preview_manager")
 def test_proxy_does_not_rewrite_when_public_base_set(mock_pm, client, monkeypatch):
     """Under wildcard subdomain, nginx handles routing — no rewriting needed."""
     monkeypatch.setenv("PREVIEW_PUBLIC_BASE", "preview.ohmyagent.ai")
@@ -215,10 +236,17 @@ def test_proxy_does_not_rewrite_when_public_base_set(mock_pm, client, monkeypatc
         content = html.encode("utf-8")
 
     class _FakeAsyncClient:
-        def __init__(self, *a, **kw): pass
-        async def __aenter__(self): return self
-        async def __aexit__(self, *a): return False
-        async def request(self, *a, **kw): return _FakeResponse()
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def request(self, *a, **kw):
+            return _FakeResponse()
 
     rec = MagicMock()
     rec.state = "preview"
@@ -231,7 +259,7 @@ def test_proxy_does_not_rewrite_when_public_base_set(mock_pm, client, monkeypatc
     assert response.text == html
 
 
-@patch("backend.api.sessions.preview_manager")
+@patch("oma_info_system.api.routes.sessions.preview_manager")
 def test_proxy_rewrites_redirect_location_header(mock_pm, client, monkeypatch):
     """Flask's /admin → /admin/ redirect must keep the proxy prefix."""
     monkeypatch.delenv("PREVIEW_PUBLIC_BASE", raising=False)
@@ -242,10 +270,17 @@ def test_proxy_rewrites_redirect_location_header(mock_pm, client, monkeypatch):
         content = b""
 
     class _FakeAsyncClient:
-        def __init__(self, *a, **kw): pass
-        async def __aenter__(self): return self
-        async def __aexit__(self, *a): return False
-        async def request(self, *a, **kw): return _FakeResponse()
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def request(self, *a, **kw):
+            return _FakeResponse()
 
     rec = MagicMock()
     rec.state = "preview"

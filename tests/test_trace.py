@@ -1,4 +1,4 @@
-from shared.trace.manager import TraceManager
+from oma_info_system.platform.trace import TraceManager
 
 
 def test_trace_manager_appends_and_reads_session_events(tmp_path):
