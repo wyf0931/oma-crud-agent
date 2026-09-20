@@ -1,3 +1,4 @@
+# pi-lens-ignore: reportMissingImports
 from oma_info_system.platform.storage import get_database
 
 

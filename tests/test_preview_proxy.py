@@ -14,14 +14,14 @@ def client(monkeypatch):
     return TestClient(app)
 
 
-@patch("oma_info_system.api.routes.sessions.preview_manager")
+@patch("oma_info_system.api.routes.preview.preview_manager")
 def test_proxy_returns_404_when_no_preview_running(mock_pm, client):
     mock_pm.get_record.return_value = None
     response = client.get("/api/sessions/sess-1/preview/proxy/admin/")
     assert response.status_code == 404
 
 
-@patch("oma_info_system.api.routes.sessions.preview_manager")
+@patch("oma_info_system.api.routes.preview.preview_manager")
 def test_proxy_returns_404_when_preview_destroyed(mock_pm, client):
     rec = MagicMock()
     rec.state = "destroyed"
@@ -31,7 +31,7 @@ def test_proxy_returns_404_when_preview_destroyed(mock_pm, client):
     assert response.status_code == 404
 
 
-@patch("oma_info_system.api.routes.sessions.preview_manager")
+@patch("oma_info_system.api.routes.preview.preview_manager")
 def test_proxy_returns_502_when_upstream_unreachable(mock_pm, client):
     """If the Flask process died or hasn't bound yet, return 502."""
     import httpx
@@ -60,7 +60,7 @@ def test_proxy_returns_502_when_upstream_unreachable(mock_pm, client):
     assert response.status_code == 502
 
 
-@patch("oma_info_system.api.routes.sessions.preview_manager")
+@patch("oma_info_system.api.routes.preview.preview_manager")
 def test_proxy_forwards_path_query_and_method_to_upstream(mock_pm, client):
     """Path, query string, method, and request body must reach the upstream."""
     captured = {}
@@ -108,11 +108,11 @@ def test_proxy_forwards_path_query_and_method_to_upstream(mock_pm, client):
     assert captured["content"] == b'{"foo": "bar"}'
 
 
-@patch("oma_info_system.api.routes.sessions.preview_manager")
-@patch("oma_info_system.api.routes.sessions._resolve_uv_bin", return_value="/usr/local/bin/uv")
-@patch("oma_info_system.api.routes.sessions._find_free_port", return_value=5012)
-@patch("oma_info_system.api.routes.sessions._wait_for_preview")
-@patch("oma_info_system.api.routes.sessions.subprocess")
+@patch("oma_info_system.api.routes.preview.preview_manager")
+@patch("oma_info_system.api.routes.preview.resolve_uv_bin", return_value="/usr/local/bin/uv")
+@patch("oma_info_system.api.routes.preview._find_free_port", return_value=5012)
+@patch("oma_info_system.api.routes.preview._wait_for_preview")
+@patch("oma_info_system.api.routes.preview.subprocess")
 def test_start_preview_includes_public_url_when_base_set(
     mock_subprocess, mock_wait, mock_port, mock_uv, mock_pm, client, tmp_path, monkeypatch
 ):
@@ -133,7 +133,7 @@ def test_start_preview_includes_public_url_when_base_set(
         "status": "completed",
         "project_path": str(project_dir),
     }
-    with patch("oma_info_system.api.routes.sessions.session_manager") as mock_sm:
+    with patch("oma_info_system.api.routes.preview.session_manager") as mock_sm:
         mock_sm.get.return_value = session
         response = client.post("/api/sessions/abc123/preview")
 
@@ -144,11 +144,11 @@ def test_start_preview_includes_public_url_when_base_set(
     assert data["preview_url"] == "http://127.0.0.1:5012/admin/"
 
 
-@patch("oma_info_system.api.routes.sessions.preview_manager")
-@patch("oma_info_system.api.routes.sessions._resolve_uv_bin", return_value="/usr/local/bin/uv")
-@patch("oma_info_system.api.routes.sessions._find_free_port", return_value=5012)
-@patch("oma_info_system.api.routes.sessions._wait_for_preview")
-@patch("oma_info_system.api.routes.sessions.subprocess")
+@patch("oma_info_system.api.routes.preview.preview_manager")
+@patch("oma_info_system.api.routes.preview.resolve_uv_bin", return_value="/usr/local/bin/uv")
+@patch("oma_info_system.api.routes.preview._find_free_port", return_value=5012)
+@patch("oma_info_system.api.routes.preview._wait_for_preview")
+@patch("oma_info_system.api.routes.preview.subprocess")
 def test_start_preview_falls_back_to_subpath_proxy_when_base_unset(
     mock_subprocess, mock_wait, mock_port, mock_uv, mock_pm, client, tmp_path, monkeypatch
 ):
@@ -168,7 +168,7 @@ def test_start_preview_falls_back_to_subpath_proxy_when_base_unset(
         "status": "completed",
         "project_path": str(project_dir),
     }
-    with patch("oma_info_system.api.routes.sessions.session_manager") as mock_sm:
+    with patch("oma_info_system.api.routes.preview.session_manager") as mock_sm:
         mock_sm.get.return_value = session
         response = client.post("/api/sessions/abc123/preview")
 
@@ -177,7 +177,7 @@ def test_start_preview_falls_back_to_subpath_proxy_when_base_unset(
     assert data["public_url"] == "/api/sessions/abc123/preview/proxy/admin/"
 
 
-@patch("oma_info_system.api.routes.sessions.preview_manager")
+@patch("oma_info_system.api.routes.preview.preview_manager")
 def test_proxy_rewrites_html_absolute_urls_in_subpath_mode(mock_pm, client, monkeypatch):
     """In subpath mode, absolute /admin/ URLs must be prefixed so the browser routes them through the proxy."""
     monkeypatch.delenv("PREVIEW_PUBLIC_BASE", raising=False)
@@ -223,7 +223,7 @@ def test_proxy_rewrites_html_absolute_urls_in_subpath_mode(mock_pm, client, monk
     assert 'href="/admin/static/foo.css"' not in body
 
 
-@patch("oma_info_system.api.routes.sessions.preview_manager")
+@patch("oma_info_system.api.routes.preview.preview_manager")
 def test_proxy_does_not_rewrite_when_public_base_set(mock_pm, client, monkeypatch):
     """Under wildcard subdomain, nginx handles routing — no rewriting needed."""
     monkeypatch.setenv("PREVIEW_PUBLIC_BASE", "preview.ohmyagent.ai")
@@ -259,7 +259,7 @@ def test_proxy_does_not_rewrite_when_public_base_set(mock_pm, client, monkeypatc
     assert response.text == html
 
 
-@patch("oma_info_system.api.routes.sessions.preview_manager")
+@patch("oma_info_system.api.routes.preview.preview_manager")
 def test_proxy_rewrites_redirect_location_header(mock_pm, client, monkeypatch):
     """Flask's /admin → /admin/ redirect must keep the proxy prefix."""
     monkeypatch.delenv("PREVIEW_PUBLIC_BASE", raising=False)

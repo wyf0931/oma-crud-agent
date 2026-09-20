@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from oma_info_system.api.routes import health, sessions
+from oma_info_system.api.routes import health, preview, projects, sessions
 from oma_info_system.api.routes import settings as settings_api
 from oma_info_system.config import settings
 from oma_info_system.platform.preview import get_preview_manager
@@ -53,6 +53,8 @@ def create_app() -> FastAPI:
 
     # Register routes
     app.include_router(sessions.router, prefix="/api")
+    app.include_router(preview.router, prefix="/api")
+    app.include_router(projects.router, prefix="/api")
     app.include_router(health.router, prefix="/api")
     app.include_router(settings_api.router, prefix="/api")
 

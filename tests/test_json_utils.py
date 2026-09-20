@@ -1,5 +1,6 @@
 import pytest
 
+# pi-lens-ignore: reportMissingImports
 from oma_info_system.json_utils import parse_json_response
 
 

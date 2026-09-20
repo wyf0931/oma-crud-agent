@@ -1,13 +1,8 @@
-"""Tests for uv binary resolution used by the preview endpoint."""
+"""Tests for uv binary resolution and the preview endpoint's error contract."""
 
 import pytest
 
-
-def _reload_resolver():
-    """Return the resolver; it reads environment and filesystem state per call."""
-    from oma_info_system.api.routes.sessions import _resolve_uv_bin
-
-    return _resolve_uv_bin
+from oma_info_system.platform.uv import UVNotFoundError, resolve_uv_bin
 
 
 def test_resolve_uv_bin_uses_env_override(monkeypatch, tmp_path):
@@ -15,8 +10,7 @@ def test_resolve_uv_bin_uses_env_override(monkeypatch, tmp_path):
     fake_uv.write_text("#!/bin/sh\n")
     monkeypatch.setenv("UV_BIN", str(fake_uv))
 
-    resolver = _reload_resolver()
-    assert resolver() == str(fake_uv)
+    assert resolve_uv_bin() == str(fake_uv)
 
 
 def test_resolve_uv_bin_falls_back_to_local_install(monkeypatch, tmp_path):
@@ -28,26 +22,43 @@ def test_resolve_uv_bin_falls_back_to_local_install(monkeypatch, tmp_path):
 
     monkeypatch.delenv("UV_BIN", raising=False)
     monkeypatch.setenv("HOME", str(fake_home))
-    # `which` should not find anything
     monkeypatch.setattr("shutil.which", lambda _: None)
 
-    resolver = _reload_resolver()
-    assert resolver() == str(fake_uv)
+    assert resolve_uv_bin() == str(fake_uv)
 
 
-def test_resolve_uv_bin_500s_when_missing(monkeypatch, tmp_path):
-    from fastapi import HTTPException
-
+def test_resolve_uv_bin_raises_when_missing(monkeypatch, tmp_path):
     monkeypatch.delenv("UV_BIN", raising=False)
     monkeypatch.setattr("shutil.which", lambda _: None)
-    # Point HOME and /usr/local/bin candidates at empty dirs
     fake_home = tmp_path / "empty_home"
     fake_home.mkdir()
     monkeypatch.setenv("HOME", str(fake_home))
-    monkeypatch.setattr("oma_info_system.api.routes.sessions.Path.exists", lambda self: False)
+    monkeypatch.setattr("oma_info_system.platform.uv.Path.exists", lambda self: False)
 
-    resolver = _reload_resolver()
-    with pytest.raises(HTTPException) as exc:
-        resolver()
-    assert exc.value.status_code == 500
-    assert "uv" in exc.value.detail.lower()
+    with pytest.raises(UVNotFoundError):
+        resolve_uv_bin()
+
+
+def test_start_preview_returns_500_when_uv_missing(monkeypatch):
+    """The route translates a missing uv binary into a 500 response."""
+    from fastapi import HTTPException
+    from fastapi.testclient import TestClient
+
+    from oma_info_system.api.app import create_app
+    from oma_info_system.api.routes import preview as preview_routes
+
+    session = {"id": "s1", "status": "completed", "project_path": __file__}
+
+    monkeypatch.setattr(preview_routes.session_manager, "get", lambda _sid: session)
+
+    def _boom() -> str:
+        raise UVNotFoundError("uv binary not found")
+
+    monkeypatch.setattr(preview_routes, "resolve_uv_bin", _boom, raising=False)
+
+    client = TestClient(create_app())
+    resp = client.post("/api/sessions/s1/preview")
+
+    assert resp.status_code == 500
+    assert "uv binary not found" in resp.json()["detail"]
+    assert HTTPException is not None

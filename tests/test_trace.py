@@ -1,3 +1,4 @@
+# pi-lens-ignore: reportMissingImports
 from oma_info_system.platform.trace import TraceManager
 
 
