@@ -5,8 +5,13 @@ import tempfile
 from pathlib import Path
 from typing import cast
 
-from conftest import parse_python
 from oma_info_system.workflow.state import AgentState
+
+
+def parse_python(filepath: Path) -> ast.Module:
+    """Parse a generated Python file for structural assertions."""
+    return ast.parse(filepath.read_text())
+
 
 # ---------------------------------------------------------------------------
 # File existence

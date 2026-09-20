@@ -1,6 +1,5 @@
 """Shared test fixtures for code generation tests."""
 
-import ast
 import random
 import secrets
 import string
@@ -132,8 +131,3 @@ def generated_empty_project(generator, empty_modules_config):
     with tempfile.TemporaryDirectory() as tmpdir:
         path = generator.generate(empty_modules_config, tmpdir)
         yield Path(path)
-
-
-# Helper to parse Python source to AST
-def parse_python(filepath: Path) -> ast.Module:
-    return ast.parse(filepath.read_text())
