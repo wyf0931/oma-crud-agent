@@ -7,7 +7,7 @@ Keep this file short. Load detailed rules only when needed.
 ## Read order
 
 1. `README.md`
-2. `oma-home/ohmyagent-ops` docs for cross-repo work
+2. The relevant source module and module-level docs before editing
 
 ## Repository identity
 

@@ -89,3 +89,7 @@ Recommended production command:
 ```bash
 uv run uvicorn backend.main:app --host 127.0.0.1 --port 8020
 ```
+
+## License
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full text.
