@@ -194,6 +194,13 @@
             d.textContent = s || '';
             return d.innerHTML;
         }
+        // Safe sink for markup built by the render* helpers below. Those helpers
+        // escape every interpolated value through escHtml() first, and this parses
+        // the result instead of assigning innerHTML, which is an injection sink.
+        function setHtml(el, html) {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            el.replaceChildren(...doc.body.childNodes);
+        }
         function toggleTheme() {
             const nextDark = !document.documentElement.classList.contains('dark');
             document.documentElement.classList.toggle('dark', nextDark);
@@ -459,15 +466,15 @@
         function renderSidebar(sessions) {
             const c = document.getElementById('sessionList');
             if (!sessions.length) { c.innerHTML = '<p class="text-center text-[#657268] text-sm py-8">暂无历史记录</p>'; return; }
-            c.innerHTML = sessions.map(s => {
+            setHtml(c, sessions.map(s => {
                 const cfg = STATUS_CFG[s.status] || STATUS_CFG.pending;
                 const time = s.created_at ? s.created_at.slice(5,16).replace('T',' ') : '';
                 const name = s.project_name || s.user_input.slice(0,20) + '...';
                 const isActive = s.id === SESSION_ID || s.id.startsWith(SESSION_ID);
                 const isCurrent = s.id === SESSION_ID;
-                const delOnclick = isCurrent ? '' : `event.preventDefault(); showDeleteDialog('${s.id}', '${escHtml(name).replace(/'/g, "\\'")}')`;
+                const delOnclick = isCurrent ? '' : `event.preventDefault(); showDeleteDialog('${String(s.id).replace(/[^A-Za-z0-9_-]/g, '')}', '${escHtml(name).replace(/'/g, "\\'")}')`;
                 const delBtnAttrs = isCurrent ? 'disabled style="opacity:0.3;cursor:not-allowed;" title="无法删除当前会话"' : 'title="删除"';
-                return `<a href="/session/${s.id}" class="session-item flex items-center gap-2 px-3 py-2.5 rounded-lg group relative ${isActive?'active-session':''}">
+                return `<a href="/session/${encodeURIComponent(s.id)}" class="session-item flex items-center gap-2 px-3 py-2.5 rounded-lg group relative ${isActive?'active-session':''}">
                     <div class="mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}"></div>
                     <div class="flex-1 min-w-0">
                         <div class="text-sm font-medium text-[#111814] truncate">${escHtml(name)}</div>
@@ -479,11 +486,9 @@
                         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                     </button>
                 </a>`;
-            }).join('');
+            }).join(''));
             safeCreateIcons();
         }
-
-        function escHtml(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 
         /* ═══════════════════════════════════════════
            Delete Dialog
@@ -508,7 +513,7 @@
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 closeDeleteDialog();
                 if (_deleteSessionId === SESSION_ID) {
-                    window.location.href = '/';
+                    window.location.assign('/');
                 } else {
                     loadSidebar();
                 }
@@ -529,7 +534,7 @@
                 </div>`;
                 if (i < WORKFLOW_STEPS.length - 1) html += `<div class="milestone-bar"></div>`;
             });
-            bar.innerHTML = html;
+            setHtml(bar, html);
         }
 
         function updateMilestones(data) {
@@ -615,13 +620,13 @@
                 summary.textContent = `${entries.length} 个自检/修复记录`;
                 const durationMs = entries.reduce((sum, [, item]) => sum + (Number(item.duration_ms) || 0), 0);
                 duration.textContent = durationMs ? formatDuration(durationMs) : '';
-                content.innerHTML = entries.length ? entries.map(([key, item], index) => `
+                setHtml(content, entries.length ? entries.map(([key, item], index) => `
                     <div class="detail-section ${item.error ? 'error' : ''}">
                         <h4 class="text-sm font-semibold ${item.error ? 'text-red-700' : 'text-[#536158]'} mb-2">第 ${index + 1} 次 · ${escHtml(item.title || key)}</h4>
                         <p class="text-sm text-[#657268] mb-2">${escHtml(item.summary || '')}</p>
                         ${item.error ? `<div class="detail-pre text-red-700">${escHtml(item.error)}</div>` : ''}
                         ${item.data ? renderStepData(key.startsWith('auto_fix') ? 'auto_fix' : 'test_launch', item.data) : ''}
-                    </div>`).join('') : '<p class="text-[#657268] text-sm">暂无自检或修复记录</p>';
+                    </div>`).join('') : '<p class="text-[#657268] text-sm">暂无自检或修复记录</p>');
                 return;
             }
             if (!detail) {
@@ -652,7 +657,7 @@
             if (detail.error) {
                 html += `<div class="detail-section error"><h4 class="text-sm font-semibold text-red-700 mb-2">❌ 错误</h4><div class="detail-pre text-red-700">${escHtml(detail.error)}</div></div>`;
             }
-            content.innerHTML = html || '<p class="text-[#657268] text-sm">无详细信息</p>';
+            setHtml(content, html || '<p class="text-[#657268] text-sm">无详细信息</p>');
 
         }
 
@@ -816,18 +821,13 @@
         function updatePreviewButton() {
             const btn = document.getElementById('previewBtn') || { disabled: true, innerHTML: '', onclick: null };
             const headerBtn = document.getElementById('headerPreviewBtn');
-            const manualBtn = document.getElementById('manualBtn');
             // Both buttons live inside the output_result detail panel — if that
             // step isn't currently selected, there's nothing to update.
-            if (!btn && !headerBtn && !manualBtn) return;
+            if (!btn && !headerBtn) return;
             if (_previewRunning) {
                 btn.disabled = false;
                 btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg><span>停止</span>`;
                 btn.onclick = stopPreview;
-                if (manualBtn) {
-                    const session = _sessionData;
-                    manualBtn.disabled = !(session && session.status === 'completed');
-                }
             } else {
                 const session = _sessionData;
                 const canPreview = session && session.status === 'completed';
@@ -836,50 +836,18 @@
                     btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg><span>预览系统</span>`;
                 }
                 btn.onclick = launchPreview;
-                if (manualBtn) {
-                    manualBtn.disabled = !canPreview;
-                }
             }
             if (headerBtn) {
                 const session = _sessionData;
                 const canPreview = session && session.status === 'completed';
                 headerBtn.disabled = !canPreview;
-                headerBtn.innerHTML = _previewRunning
-                    ? '<i data-lucide="square" class="h-3.5 w-3.5"></i><span>停止</span>'
-                    : '<i data-lucide="eye" class="h-3.5 w-3.5"></i><span>预览</span>';
+                if (_previewRunning) {
+                    headerBtn.innerHTML = '<i data-lucide="square" class="h-3.5 w-3.5"></i><span>停止</span>';
+                } else {
+                    headerBtn.innerHTML = '<i data-lucide="eye" class="h-3.5 w-3.5"></i><span>预览</span>';
+                }
                 headerBtn.onclick = _previewRunning ? stopPreview : launchPreview;
                 safeCreateIcons();
-            }
-        }
-
-        async function generateManual() {
-            const btn = document.getElementById('manualBtn');
-            const spinner = document.getElementById('manualSpinner');
-            if (!btn || btn.disabled) return;
-            btn.disabled = true;
-            spinner.classList.remove('hidden');
-            try {
-                const resp = await fetch(`/api/sessions/${SESSION_ID}/manual`, { method: 'POST' });
-                if (!resp.ok) {
-                    const err = await resp.json().catch(() => ({ detail: resp.statusText }));
-                    alert('生成手册失败: ' + (err.detail || ''));
-                    return;
-                }
-                const result = await resp.json();
-                // Trigger browser download
-                const a = document.createElement('a');
-                a.href = result.manual_url;
-                a.download = result.manual_filename || 'manual.docx';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                // Refresh step details to show new entry
-                await loadSession();
-            } catch (e) {
-                alert('生成手册出错: ' + e.message);
-            } finally {
-                spinner.classList.add('hidden');
-                btn.disabled = false;
             }
         }
 

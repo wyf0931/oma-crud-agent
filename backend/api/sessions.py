@@ -15,7 +15,7 @@ from urllib.parse import quote
 
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import Response
 from pydantic import BaseModel
 from typing import Optional
 
@@ -387,102 +387,6 @@ async def list_sessions(limit: int = 50):
     """List all sessions."""
     sessions = session_manager.list(limit=limit)
     return {"sessions": sessions}
-
-
-@router.post("/sessions/{session_id}/manual")
-async def generate_manual(session_id: str):
-    """Generate the user manual docx for a completed session."""
-    session = session_manager.get(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    if session.get("status") != "completed":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Session status is '{session.get('status')}', must be 'completed'",
-        )
-
-    project_path = session.get("project_path")
-    if not project_path or not Path(project_path).exists():
-        raise HTTPException(status_code=400, detail="Project path not found")
-
-    project_config = session.get("project_config")
-    if not project_config:
-        raise HTTPException(status_code=400, detail="Project config missing")
-
-    # 1. Generate outline via LLM (with fallback)
-    from agent.docs.outline import generate_outline
-    outline, outline_error = generate_outline(
-        project_config,
-        business_domain=session.get("business_domain") or "",
-        return_error=True,
-    )
-
-    # 2. Build the docx
-    from agent.docs.builder import build_manual
-    project = project_config["project"]
-    # Sanitize project name: strip characters that would break Path or escape docs/
-    safe_name = re.sub(r'[\\/:*?"<>|]', "_", project["name"])
-    output_filename = f"{safe_name}{project['version']}使用手册.docx"
-    output_path = str(Path(project_path) / "docs" / output_filename)
-
-    build_manual(project_config, outline, output_path)
-
-    # 3. Persist step_details
-    detail = {
-        "title": "用户手册生成",
-        "summary": f"生成 {len(project_config.get('modules', []))} 个模块的 docx 手册"
-                   + (f" (LLM 大纲失败，使用 fallback: {outline_error})" if outline_error else ""),
-        "prompt": "",
-        "response": outline.model_dump_json() if outline else "",
-        "thinking": None,
-        "data": {
-            "manual_path": output_path,
-            "manual_filename": output_filename,
-            "outline": outline.model_dump() if outline else {},
-            "module_count": len(project_config.get("modules", [])),
-            "outline_error": outline_error or None,
-        },
-        "duration_ms": None,
-        "error": outline_error or None,
-    }
-
-    session_manager.update(session_id, {
-        "step_details": {
-            **(session.get("step_details") or {}),
-            "generate_user_manual": detail,
-        }
-    })
-
-    return {
-        "manual_url": f"/api/sessions/{session_id}/manual/file",
-        "manual_path": output_path,
-        "manual_filename": output_filename,
-        "generated_at": datetime.now().isoformat(),
-        "outline_error": outline_error or None,
-    }
-
-
-@router.get("/sessions/{session_id}/manual/file")
-async def download_manual(session_id: str):
-    """Stream the generated docx file."""
-    session = session_manager.get(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    step_details = session.get("step_details") or {}
-    manual_detail = step_details.get("generate_user_manual") or {}
-    manual_path = (manual_detail.get("data") or {}).get("manual_path")
-
-    if not manual_path or not Path(manual_path).exists():
-        raise HTTPException(status_code=404, detail="Manual not generated yet")
-
-    filename = (manual_detail.get("data") or {}).get("manual_filename", "manual.docx")
-    return FileResponse(
-        path=str(manual_path),
-        filename=str(filename),
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    )
 
 
 _PROJECT_ZIP_EXCLUDED_DIRS = {
