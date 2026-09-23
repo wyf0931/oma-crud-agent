@@ -5,6 +5,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from oma_info_system import __version__
+
 # Directory holding this package. Resolving from here works both in a source
 # checkout and in an installed wheel, unlike a repo-root relative path.
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -64,7 +66,7 @@ class Settings:
 
     # Application
     APP_NAME: str = "Info System Agent"
-    APP_VERSION: str = "0.1.0"
+    APP_VERSION: str = __version__
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
 
     # Server
