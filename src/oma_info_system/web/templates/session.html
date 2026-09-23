@@ -100,7 +100,6 @@
             box-shadow: 0 20px 60px rgba(0,0,0,0.15);
             max-width: 400px; width: 90%;
         }
-        .task-duration { white-space: nowrap; }
         .app-shell { background: #f7f8f4; }
         .app-sidebar {
             width: 260px;
@@ -308,7 +307,6 @@
                             </button>
                         </div>
                         <div class="flex items-center gap-3 shrink-0">
-                            <span id="taskDuration" class="task-duration text-xs text-[#657268]" aria-label="任务总耗时"></span>
                             <div id="statusBadge" class="status-badge pending">初始化</div>
                         </div>
                     </div>
@@ -571,11 +569,6 @@
             return `总耗时 ${formatDuration(Math.max(0, ended - started))}`;
         }
 
-        function updateTaskDuration(data) {
-            const element = document.getElementById('taskDuration');
-            if (element) element.textContent = formatTaskDuration(data);
-        }
-
         function milestoneIdForStep(stepId) {
             return ['test_launch', 'auto_fix'].includes(stepId) ? 'quality_check' : stepId;
         }
@@ -768,7 +761,6 @@
                 document.getElementById('navSessionName').textContent = name;
                 document.title = name + ' - OMA';
                 updateStatus(data.status);
-                updateTaskDuration(data);
                 updateMilestones(data);
                 updatePreviewButton();
                 if (data.status === 'completed') {
