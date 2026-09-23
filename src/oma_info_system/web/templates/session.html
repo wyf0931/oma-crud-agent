@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>会话 {session_id} - 灯神 · Wishlamp</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="/static/js/lucide.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -293,7 +293,7 @@
                         <a href="/" class="hidden sm:inline-flex h-10 w-10 items-center justify-center rounded-lg border-0 bg-transparent text-[#657268] hover:bg-[#edf1e8] hover:text-[#536158] transition-colors" title="返回">
                             <i data-lucide="chevron-left" class="h-5 w-5"></i>
                         </a>
-                        <span id="navSessionName" class="truncate text-sm font-medium text-[#536158]">Session</span>
+                        <span id="navSessionName" class="truncate text-sm font-bold text-[#111814]">Session</span>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
                         <div id="headerActions" class="hidden items-center gap-2">
@@ -303,7 +303,7 @@
                             </button>
                             <button id="headerDownloadBtn" onclick="downloadProject()" class="inline-flex items-center gap-1.5 rounded-lg bg-[#146c5f] px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#0e574d]">
                                 <i data-lucide="download" class="h-3.5 w-3.5"></i>
-                                <span>下载项目</span>
+                                <span>下载</span>
                             </button>
                         </div>
                         <div class="flex items-center gap-3 shrink-0">
